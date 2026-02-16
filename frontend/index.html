@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>frontend</title>
+    <!-- 核心加这行：顶层消除所有默认边距，强制html/body/#app撑满视口 -->
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box; /* 避免内边距撑大容器，后续布局不错位 */
+      }
+      html, body {
+        width: 100%;
+        height: 100vh; /* 强制撑满浏览器视口，无任何留白 */
+        overflow: hidden; /* 避免页面整体滚动，和你的布局overflow匹配 */
+      }
+      #app {
+        width: 100%;
+        height: 100%; /* 继承html/body的宽高，完全撑满，无白边 */
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
