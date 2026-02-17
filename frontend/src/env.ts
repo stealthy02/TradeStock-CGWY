@@ -1,2 +1,4 @@
 // 根据环境设置不同的API基础URL
-export const BASE_URL = '/api'  // 无论开发还是生产环境，都使用相对路径访问API
+const baseUrl = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000'
+const apiUrl = import.meta.env.VITE_API_URL || '/api'
+export const BASE_URL = baseUrl + apiUrl
