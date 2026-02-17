@@ -1,0 +1,1 @@
+import{r as e}from"./request-DINYhP-L.js";const o=t=>e({url:"/inventory/list",method:"get",params:t}),r=t=>e({url:"/inventory/detail",method:"get",params:t}),s=t=>e({url:"/inventory/loss/add",method:"post",data:t}),l=t=>e({url:"/inventory/loss/list",method:"get",params:t}),d=t=>e({url:"/inventory/loss/delete",method:"delete",params:t});export{l as a,s as b,r as c,d,o as g};
