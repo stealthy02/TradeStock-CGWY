@@ -187,7 +187,7 @@ class PurchaseStatementRepository:
         
         # 构建查询，处理end_date为空的情况
         from sqlalchemy import or_
-        result = self.db.query(func.sum(PurchaseStatement.statement_amount)).filter(
+        query = self.db.query(func.sum(PurchaseStatement.statement_amount)).filter(
             PurchaseStatement.is_deleted == False,
             or_(
                 # end_date不为空且在时间范围内
@@ -199,5 +199,8 @@ class PurchaseStatementRepository:
                 (today_date >= start_date_date) & 
                 (today_date <= end_date_date)
             )
-        ).scalar()
-        return Decimal(str(result)) if result is not None else Decimal("0.00")
+        )
+        
+        # 使用first()方法获取结果，避免scalar()的MultipleResultsFound错误
+        result = query.first()
+        return Decimal(str(result[0])) if result and result[0] is not None else Decimal("0.00")

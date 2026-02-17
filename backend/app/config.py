@@ -21,7 +21,7 @@ def get_base_dir():
     """
     # 如果在打包环境中，使用 sys._MEIPASS 获取打包后的资源目录
     if hasattr(sys, '_MEIPASS'):
-        return Path(sys._MEIPASS)
+        return Path(getattr(sys, '_MEIPASS'))  # type: ignore
     # 否则使用文件所在目录的上级目录
     return Path(__file__).parent.parent
 

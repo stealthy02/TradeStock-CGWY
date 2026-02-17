@@ -166,8 +166,8 @@ print(f"当前工作目录: {os.getcwd()}")
 # 静态文件目录
 static_dir = None
 
-# 开发环境路径
-dev_dist_path = os.path.join(current_dir, "..", "dist")
+# 开发环境路径 - 前端构建后的目录
+dev_dist_path = os.path.join(os.path.dirname(current_dir), "frontend", "dist")
 if os.path.exists(dev_dist_path) and os.path.isdir(dev_dist_path):
     index_path = os.path.join(dev_dist_path, "index.html")
     if os.path.exists(index_path):
@@ -178,7 +178,8 @@ if os.path.exists(dev_dist_path) and os.path.isdir(dev_dist_path):
 if not static_dir:
     possible_paths = [
         os.path.join(current_dir, "dist"),
-        os.path.join(os.path.dirname(current_dir), "dist")
+        os.path.join(os.path.dirname(current_dir), "dist"),
+        os.path.join(current_dir, "frontend", "dist")
     ]
     
     for path in possible_paths:
@@ -253,12 +254,12 @@ if static_dir:
     else:
         print(f"assets目录不存在: {assets_path}")
     
-    # 挂载根目录，这样可以直接访问index.html和其他静态文件
-    print(f"挂载根目录静态文件: {static_dir}")
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="root")
+    # 挂载静态文件目录，但不使用html=True，避免影响SPA路由
+    print(f"挂载静态文件目录: {static_dir}")
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
     
     # 为SPA添加通配符路由，确保所有前端路由都返回index.html
-    # 这个路由必须放在最后，确保API路由和静态文件优先匹配
+    # 这个路由必须放在最后，确保API路由优先匹配
     @app.get("/{path:path}")
     async def serve_spa(path: str):
         """
@@ -280,6 +281,20 @@ if static_dir:
         if os.path.exists(index_path):
             return FileResponse(index_path)
         
+        return ResponseModel(data={"message": "页面未找到"}, code=404).model_dump()
+    
+    # 根路径处理
+    @app.get("/")
+    async def serve_root():
+        """
+        根路径返回index.html
+        
+        Returns:
+            FileResponse: index.html文件响应
+        """
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
         return ResponseModel(data={"message": "页面未找到"}, code=404).model_dump()
 else:
     print("警告: 未找到静态文件目录")

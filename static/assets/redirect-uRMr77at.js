@@ -1,1 +1,0 @@
-import{d as o,O as s,g as u,u as a}from"./.pnpm-B0XLMEKp.js";const _=o({__name:"redirect",setup(n){const r=u(),e=a();return s(()=>{const{path:t}=e.params;r.replace({path:"/"+t,query:e.query})}),(t,c)=>null}});export{_ as default};

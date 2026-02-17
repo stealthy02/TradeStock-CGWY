@@ -89,8 +89,8 @@ async def get_last_purchase_record(
 @router.get("/bill/list", response_model=ResponseModel[PageModel[dict]])
 async def list_purchase_bills(
     supplier_name: Optional[str] = Query(None),
-    pay_status: Optional[str] = Query(None, regex="^(\\d+|)$"),
-    invoice_status: Optional[str] = Query(None, regex="^(\\d+|)$"),
+    pay_status: Optional[str] = Query(None, pattern="^(\\d+|)$"),
+    invoice_status: Optional[str] = Query(None, pattern="^(\\d+|)$"),
     min_amount: Optional[float] = Query(None),
     max_amount: Optional[float] = Query(None),
     page_num: int = Query(1),

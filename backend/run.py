@@ -23,7 +23,7 @@ def get_base_dir():
     """
     # 如果在打包环境中，使用 sys._MEIPASS 获取打包后的资源目录
     if hasattr(sys, '_MEIPASS'):
-        return Path(sys._MEIPASS)
+        return Path(getattr(sys, '_MEIPASS'))  # type: ignore
     # 否则使用文件所在目录
     return Path(__file__).parent
 
@@ -41,11 +41,12 @@ def get_static_dir():
     if hasattr(sys, '_MEIPASS'):
         # PyInstaller 打包后，sys._MEIPASS 是临时解压目录
         # 实际静态文件会被 Electron 放到 resources 目录下
-        static_dir = Path(sys._MEIPASS).parent.parent / "dist"
+        static_dir = Path(getattr(sys, '_MEIPASS')).parent.parent / "dist"  # type: ignore
     else:
         # 开发环境：指向 Vue 项目打包后的 dist 目录
         # 假设当前文件在 backend/ 目录，Vue 目录在 ../frontend/
         static_dir = base_dir.parent / "frontend" / "dist"
+        print(f"[调试] 开发环境静态文件目录：{static_dir}")
     
     return static_dir.resolve()
 
@@ -73,7 +74,6 @@ def is_port_available(host: str, port: int) -> bool:
 def run_server_with_port_fallback(host: str, start_port: int, max_retries: int = 5):
     """
     启动服务器，若端口被占用则自动重试后续端口
-    挂载前端静态文件
     
     Args:
         host (str): 主机地址
@@ -83,24 +83,8 @@ def run_server_with_port_fallback(host: str, start_port: int, max_retries: int =
     Raises:
         RuntimeError: 当所有端口都被占用时
     """
-    # 挂载 Vue 静态文件
-    try:
-        static_dir = get_static_dir()
-        if static_dir.exists():
-            # 挂载静态文件，支持 SPA 路由（html=True）
-            app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
-            print(f"[成功] 挂载前端静态文件：{static_dir}")
-            
-            # 移除根路径的 API 路由，确保静态文件优先响应
-            for route in app.routes:
-                if hasattr(route, "path") and route.path == "/":
-                    app.routes.remove(route)
-                    print("[成功] 已移除根路径 API 路由，确保静态文件优先响应")
-                    break
-        else:
-            print(f"[警告] 前端静态文件目录不存在：{static_dir}，仅启动 API 服务")
-    except Exception as e:
-        print(f"[警告] 挂载静态文件失败：{e}")
+    # 静态文件挂载已在 app/main.py 中处理
+    print("[信息] 静态文件挂载由 app/main.py 处理")
 
     current_port = start_port
     retries = 0
