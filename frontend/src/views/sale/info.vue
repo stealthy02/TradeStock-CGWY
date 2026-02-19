@@ -2,21 +2,16 @@
   <div class="page-container">
     <h1>销售信息录入/查询</h1>
     
-    <a-button type="primary" style="margin-bottom: 16px" @click="openAddModal">
-      <template #icon><PlusOutlined /></template>
-      新增销售信息
-    </a-button>
-    
     <a-form
       v-if="showSearch"
       :model="searchParams"
       layout="inline"
       style="margin-bottom: 16px"
     >
-      <a-form-item label="采购商名称">
+      <a-form-item label="客户名称">
         <a-select
           v-model:value="searchParams.purchaser_name"
-          placeholder="请选择采购商"
+          placeholder="请选择客户"
           show-search
           :filter-option="false"
           :options="purchaserOptions"
@@ -54,8 +49,8 @@
     
     <a-table
       :columns="columns"
-      :data-source="dataSource"
-      :row-key="(record) => record.id"
+      :data-source="tableDataSource"
+      :row-key="(record) => record.key || record.id"
       :pagination="{
         showSizeChanger: true,
         pageSizeOptions: ['10', '20', '50', '100'],
@@ -65,105 +60,217 @@
         onChange: handlePageChange,
         onShowSizeChange: handlePageSizeChange
       }"
-      :scroll="{ x: 1600 }"
+      :scroll="{ x: 1300 }"
       :loading="loading"
-    />
-    
-    <a-modal
-      v-model:open="modalVisible"
-      :title="modalTitle"
-      width="600px"
-      destroyOnClose
-      :footer="null"
     >
-      <a-form
-        :model="formData"
-        :rules="formRules"
-        layout="vertical"
-      >
-        <a-form-item label="采购商名称" name="purchaser_name">
-          <a-select
-            v-model:value="formData.purchaser_name"
-            placeholder="请选择采购商"
-            show-search
-            :filter-option="false"
-            :options="purchaserOptions"
-            @search="handlePurchaserSearch"
-            @change="handlePurchaserChange"
-          />
-        </a-form-item>
-        <a-form-item label="商品名称" name="product_name">
-          <a-select
-            v-model:value="formData.product_name"
-            :options="productOptions"
-            placeholder="请输入商品名称"
-            show-search
-            :filter-option="false"
-            @search="handleProductSearch"
-            @change="handleProductChange"
-            style="width: 100%"
-          />
-        </a-form-item>
-        <a-form-item label="商品规格" name="product_spec">
-          <a-input
-            v-model:value="formData.product_spec"
-            placeholder="请输入商品规格，例如：30"
-          />
-        </a-form-item>
-        <a-form-item label="客户侧商品名" name="customer_product_name">
-          <a-input
-            v-model:value="formData.customer_product_name"
-            placeholder="请输入客户侧商品名"
-          />
-        </a-form-item>
-        <a-form-item label="销售数量" name="sale_num">
-          <a-input-number
-            v-model:value="formData.sale_num"
-            :min="1"
-            :step="1"
-            :precision="0"
-            placeholder="请输入销售数量"
-          />
-        </a-form-item>
-        <a-form-item label="销售单价" name="sale_price">
-          <a-input-number
-            v-model:value="formData.sale_price"
-            :min="0.01"
-            :step="0.01"
-            :precision="2"
-            placeholder="请输入销售单价"
-          />
-        </a-form-item>
-        <a-form-item label="销售日期" name="sale_date">
-          <a-date-picker
-            v-model:value="formData.sale_date"
-            format="YYYY-MM-DD"
-            style="width: 100%"
-          />
-        </a-form-item>
-        <a-form-item label="备注" name="remark">
-          <a-textarea
-            v-model:value="formData.remark"
-            :rows="4"
-            :maxLength="200"
-            placeholder="请输入备注信息"
-          />
-        </a-form-item>
-        <a-form-item style="margin-top: 24px">
-          <a-button type="primary" @click="handleSubmit">提交</a-button>
-          <a-button style="margin-left: 8px" @click="handleReset">重置</a-button>
-          <a-button style="margin-left: 8px" @click="modalVisible = false">取消</a-button>
-        </a-form-item>
-      </a-form>
-    </a-modal>
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'purchaser_name'">
+          <template v-if="record.key === 'new-row'">
+            <a-select
+              v-model:value="newRow.purchaser_name"
+              placeholder="请选择客户"
+              show-search
+              :filter-option="false"
+              :options="purchaserOptions"
+              @search="handlePurchaserSearch"
+              @change="(val: any) => val && newRow.product_name && fetchNewRowLastPrice(val as string, newRow.product_name)"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-select
+              v-model:value="editingRows[record.id].purchaser_name"
+              placeholder="请选择客户"
+              show-search
+              :filter-option="false"
+              :options="purchaserOptions"
+              @search="handlePurchaserSearch"
+              @change="(val: any) => val && editingRows[record.id].product_name && fetchEditingRowLastPrice(record.id, val as string, editingRows[record.id].product_name)"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else>{{ record.purchaser_name }}</template>
+        </template>
+        <template v-else-if="column.key === 'product_name'">
+          <template v-if="record.key === 'new-row'">
+            <a-select
+              v-model:value="newRow.product_name"
+              placeholder="请输入商品名称"
+              show-search
+              :filter-option="false"
+              :options="newRowProductOptions"
+              @search="handleNewRowProductSearch"
+              @change="(val: any) => val && newRow.purchaser_name && fetchNewRowLastPrice(newRow.purchaser_name, val as string)"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-select
+              v-model:value="editingRows[record.id].product_name"
+              placeholder="请输入商品名称"
+              show-search
+              :filter-option="false"
+              :options="editingRowProductOptions[record.id] || []"
+              @search="(val: string) => handleEditingRowProductSearch(record.id, val)"
+              @change="(val: any) => val && editingRows[record.id].purchaser_name && fetchEditingRowLastPrice(record.id, editingRows[record.id].purchaser_name, val as string)"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else>{{ record.product_name }}</template>
+        </template>
+        <template v-else-if="column.key === 'product_spec'">
+          <template v-if="record.key === 'new-row'">
+            <a-input
+              v-model:value="newRow.product_spec"
+              placeholder="请输入商品规格，例如：30"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-input
+              v-model:value="editingRows[record.id].product_spec"
+              placeholder="请输入商品规格，例如：30"
+            />
+          </template>
+          <template v-else>{{ record.product_spec }}</template>
+        </template>
+        <template v-else-if="column.key === 'customer_product_name'">
+          <template v-if="record.key === 'new-row'">
+            <a-input
+              v-model:value="newRow.customer_product_name"
+              placeholder="请输入客户侧商品名"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-input
+              v-model:value="editingRows[record.id].customer_product_name"
+              placeholder="请输入客户侧商品名"
+            />
+          </template>
+          <template v-else>{{ record.customer_product_name }}</template>
+        </template>
+        <template v-else-if="column.key === 'sale_num'">
+          <template v-if="record.key === 'new-row'">
+            <a-input-number
+              v-model:value="newRow.sale_num"
+              :min="1"
+              :step="1"
+              :precision="0"
+              placeholder="请输入销售数量"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-input-number
+              v-model:value="editingRows[record.id].sale_num"
+              :min="1"
+              :step="1"
+              :precision="0"
+              placeholder="请输入销售数量"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else>{{ record.sale_num }}</template>
+        </template>
+        <template v-else-if="column.key === 'sale_price'">
+          <template v-if="record.key === 'new-row'">
+            <a-input-number
+              v-model:value="newRow.sale_price"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              placeholder="请输入销售单价"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-input-number
+              v-model:value="editingRows[record.id].sale_price"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              placeholder="请输入销售单价"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else>{{ record.sale_price?.toFixed(2) }}</template>
+        </template>
+        <template v-else-if="column.key === 'total_price'">
+          <template v-if="record.key === 'new-row'">
+            {{ ((newRow.sale_num || 0) * (newRow.sale_price || 0) * (Number(newRow.product_spec) || 0)).toFixed(2) }}
+          </template>
+          <template v-else-if="record.isEditing">
+            {{ ((editingRows[record.id].sale_num || 0) * (editingRows[record.id].sale_price || 0) * (Number(editingRows[record.id].product_spec) || 0)).toFixed(2) }}
+          </template>
+          <template v-else>{{ record.total_price?.toFixed(2) }}</template>
+        </template>
+        <template v-else-if="column.key === 'total_profit'">
+          <template v-if="record.key === 'new-row'">-</template>
+          <template v-else-if="record.isEditing">-</template>
+          <template v-else>{{ record.total_profit?.toFixed(2) }}</template>
+        </template>
+        <template v-else-if="column.key === 'sale_date'">
+          <template v-if="record.key === 'new-row'">
+            <a-date-picker
+              v-model:value="newRow.sale_date"
+              format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-date-picker
+              v-model:value="editingRows[record.id].sale_date"
+              format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else>{{ record.sale_date }}</template>
+        </template>
+        <template v-else-if="column.key === 'remark'">
+          <template v-if="record.key === 'new-row'">
+            <a-textarea
+              v-model:value="newRow.remark"
+              :rows="1"
+              :maxLength="200"
+              placeholder="请输入备注信息"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-textarea
+              v-model:value="editingRows[record.id].remark"
+              :rows="1"
+              :maxLength="200"
+              placeholder="请输入备注信息"
+            />
+          </template>
+          <template v-else>
+            <a-tooltip :title="record.remark" v-if="record.remark">
+              {{ record.remark.length > 4 ? record.remark.substring(0, 4) + '...' : record.remark }}
+            </a-tooltip>
+            <template v-else>-</template>
+          </template>
+        </template>
+        <template v-else-if="column.key === 'action'">
+          <template v-if="record.key === 'new-row'">
+            <a-button type="primary" size="small" @click="handleAdd" style="background-color: #52c41a; border-color: #52c41a">添</a-button>
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-button type="primary" size="small" @click="handleSave(record.id)" style="margin-right: 8px">保</a-button>
+            <a-button size="small" @click="handleCancelEdit(record.id)">取</a-button>
+          </template>
+          <template v-else>
+            <a-button size="small" @click="handleEdit(record)" style="margin-right: 8px">编</a-button>
+            <a-button size="small" danger @click="handleDelete(record.id)">删</a-button>
+          </template>
+        </template>
+      </template>
+    </a-table>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, h } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { PlusOutlined, ExclamationCircleOutlined } from '@ant-design/icons-vue';
-import { message, Modal, Tooltip } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
 import dayjs from 'dayjs';
 import type { SaleInfoItem, AddSaleInfoReq, UpdateSaleInfoReq, SaleInfoListQuery } from '@/types';
 import {
@@ -177,17 +284,17 @@ import {
 import { getPurchaserSelect } from '@/api/basic';
 import request from '@/utils/request';
 
-const modalVisible = ref(false);
-const modalTitle = ref('新增销售信息');
 const showSearch = ref(true);
 const purchaserOptions = ref<any[]>([]);
 const productOptions = ref<any[]>([]);
 const searchProductOptions = ref<any[]>([]);
+const newRowProductOptions = ref<any[]>([]);
+const editingRowProductOptions = ref<Record<number, any[]>>({});
 const dataSource = ref<any[]>([]);
 const total = ref(0);
 const loading = ref(false);
+const editingRows = ref<Record<number, any>>({});
 
-// 路由实例
 const route = useRoute();
 
 const searchParams = reactive<SaleInfoListQuery>({
@@ -195,121 +302,113 @@ const searchParams = reactive<SaleInfoListQuery>({
   page_size: 10
 });
 
-const formData = reactive<AddSaleInfoReq & Partial<UpdateSaleInfoReq>>(
-  {
-    purchaser_name: '',
-    product_name: '',
-    product_spec: '',
-    customer_product_name: '',
-    sale_num: 0,
-    sale_price: 0,
-    sale_date: dayjs(),
-    remark: ''
-  } as any
-);
+const newRow = reactive<any>({
+  key: 'new-row',
+  purchaser_name: '',
+  product_name: '',
+  product_spec: '',
+  customer_product_name: '',
+  sale_num: undefined,
+  sale_price: undefined,
+  sale_date: dayjs(),
+  remark: '',
+  purchaser_id: undefined
+});
 
-const formRules = reactive<any>({
-  purchaser_name: [
-    { required: true, message: '请选择采购商', trigger: ['change'] }
-  ],
-  product_name: [
-    { required: true, message: '请输入商品名称', trigger: ['blur', 'change'] }
-  ],
-  product_spec: [
-    { required: true, message: '请输入商品规格', trigger: ['blur', 'change'] }
-  ],
-  sale_num: [
-    { required: true, message: '请输入销售数量', trigger: ['blur', 'change'] },
-    { type: 'number', min: 1, message: '销售数量必须为正整数', trigger: ['blur', 'change'] }
-  ],
-  sale_price: [
-    { required: true, message: '请输入销售单价', trigger: ['blur', 'change'] },
-    { type: 'number', min: 0.01, message: '销售单价必须为正数', trigger: ['blur', 'change'] }
-  ],
-  sale_date: [
-    { required: true, message: '请选择销售日期', trigger: ['change'] }
-  ]
+const tableDataSource = computed(() => {
+  const result: any[] = [{ ...newRow }];
+  dataSource.value.forEach(item => {
+    const isEditing = !!editingRows.value[item.id];
+    result.push({ ...item, isEditing });
+  });
+  return result;
 });
 
 const columns = computed(() => [
   {
-    title: '采购商名称',
+    title: '销售日期',
+    dataIndex: 'sale_date',
+    key: 'sale_date',
+    sorter: true,
+    ellipsis: true,
+    width: 120
+  },
+  {
+    title: '客户名称',
     dataIndex: 'purchaser_name',
     key: 'purchaser_name',
     sorter: true,
-    ellipsis: true
+    ellipsis: true,
+    width: 130
   },
   {
     title: '商品名称',
     dataIndex: 'product_name',
     key: 'product_name',
     sorter: true,
-    ellipsis: true
+    ellipsis: true,
+    width: 130
   },
   {
     title: '商品规格',
     dataIndex: 'product_spec',
     key: 'product_spec',
     sorter: true,
-    ellipsis: true
+    ellipsis: true,
+    width: 90
   },
   {
     title: '客户侧商品名',
     dataIndex: 'customer_product_name',
     key: 'customer_product_name',
     sorter: true,
-    ellipsis: true
+    ellipsis: true,
+    width: 100
   },
   {
     title: '销售数量',
     dataIndex: 'sale_num',
     key: 'sale_num',
     sorter: true,
-    ellipsis: true
+    ellipsis: true,
+    width: 90
   },
-  { title: '销售单价', dataIndex: 'sale_price', key: 'sale_price', sorter: true, ellipsis: true, customRender: (opt: any) => opt.record.sale_price.toFixed(2) },
-  { title: '销售总价', dataIndex: 'total_price', key: 'total_price', sorter: true, ellipsis: true, customRender: (opt: any) => opt.record.total_price.toFixed(2) },
-  { title: '商品单位利润', dataIndex: 'unit_profit', key: 'unit_profit', sorter: true, ellipsis: true, customRender: (opt: any) => opt.record.unit_profit.toFixed(2) },
-  { title: '商品总利润', dataIndex: 'total_profit', key: 'total_profit', sorter: true, ellipsis: true, customRender: (opt: any) => opt.record.total_profit.toFixed(2) },
-  {
-    title: '销售日期',
-    dataIndex: 'sale_date',
-    key: 'sale_date',
-    sorter: true,
-    ellipsis: true
+  { 
+    title: '销售单价', 
+    dataIndex: 'sale_price', 
+    key: 'sale_price', 
+    sorter: true, 
+    ellipsis: true, 
+    width: 100
+  },
+  { 
+    title: '销售总价', 
+    dataIndex: 'total_price', 
+    key: 'total_price', 
+    sorter: true, 
+    ellipsis: true, 
+    width: 100
+  },
+  { 
+    title: '商品总利润', 
+    dataIndex: 'total_profit', 
+    key: 'total_profit', 
+    sorter: true, 
+    ellipsis: true, 
+    width: 110
   },
   {
     title: '备注',
     dataIndex: 'remark',
     key: 'remark',
     ellipsis: true,
-    customRender: (opt: any) => {
-      const remark = opt.record.remark;
-      if (!remark) return '-';
-      const shortRemark = remark.length > 4 ? remark.substring(0, 4) + '...' : remark;
-      return h(Tooltip, { title: remark }, { default: () => shortRemark });
-    }
+    width: 100
   },
-  { title: '操作',
+  { 
+    title: '操作',
     key: 'action',
     fixed: 'right' as const,
-    width: 80,
-    customRender: ({ record }: { record: SaleInfoItem }) => {
-      return h('div', [
-        h('span', {
-          style: {
-            display: 'inline-block',
-            padding: '2px 8px',
-            backgroundColor: '#ff4d4f',
-            color: '#fff',
-            borderRadius: '2px',
-            cursor: 'pointer',
-            fontSize: '12px'
-          },
-          onClick: () => handleDelete(record.id)
-        }, '删')
-      ]);
-    }
+    width: 140
   }
 ]) as any;
 
@@ -364,46 +463,11 @@ const handlePurchaserSearch = async (value: string) => {
       value: name
     }));
   } catch (error) {
-    console.error('获取采购商列表失败:', error);
-  }
-};
-
-const handlePurchaserChange = async (value: any) => {
-  if (value && formData.product_name) {
-    await fetchLastPrice(value, formData.product_name);
-  }
-};
-
-const handleProductSearch = async (value: string) => {
-  if (!value) {
-    productOptions.value = [];
-    return;
-  }
-  
-  try {
-    const response = await getSaleProductSelect({ keyword: value });
-    if (Array.isArray(response.data)) {
-      productOptions.value = response.data.map((name: string) => ({
-        label: name,
-        value: name
-      }));
-    } else {
-      productOptions.value = [];
-    }
-  } catch (error) {
-    console.error('获取商品列表失败:', error);
-    productOptions.value = [];
-  }
-};
-
-const handleProductChange = async (value: any) => {
-  if (value && formData.purchaser_name) {
-    await fetchLastPrice(formData.purchaser_name, value);
+    console.error('获取客户列表失败:', error);
   }
 };
 
 const handleSearchProductSearch = async (value: string) => {
-  if (!value) return;
   try {
     const response = await getSaleProductSelect({ keyword: value });
     if (Array.isArray(response.data)) {
@@ -420,7 +484,41 @@ const handleSearchProductSearch = async (value: string) => {
   }
 };
 
-const fetchLastPrice = async (purchaserName: string, productName: string) => {
+const handleNewRowProductSearch = async (value: string) => {
+  try {
+    const response = await getSaleProductSelect({ keyword: value });
+    if (Array.isArray(response.data)) {
+      newRowProductOptions.value = response.data.map((name: string) => ({
+        label: name,
+        value: name
+      }));
+    } else {
+      newRowProductOptions.value = [];
+    }
+  } catch (error) {
+    console.error('获取商品列表失败:', error);
+    newRowProductOptions.value = [];
+  }
+};
+
+const handleEditingRowProductSearch = async (id: number, value: string) => {
+  try {
+    const response = await getSaleProductSelect({ keyword: value });
+    if (Array.isArray(response.data)) {
+      editingRowProductOptions.value[id] = response.data.map((name: string) => ({
+        label: name,
+        value: name
+      }));
+    } else {
+      editingRowProductOptions.value[id] = [];
+    }
+  } catch (error) {
+    console.error('获取商品列表失败:', error);
+    editingRowProductOptions.value[id] = [];
+  }
+};
+
+const fetchNewRowLastPrice = async (purchaserName: string, productName: string) => {
   try {
     const response = await getLastSalePrice({
       purchaser_name: purchaserName,
@@ -430,13 +528,13 @@ const fetchLastPrice = async (purchaserName: string, productName: string) => {
     const data = response.data;
     if (data) {
       if (data.sale_price) {
-        formData.sale_price = data.sale_price;
+        newRow.sale_price = data.sale_price;
       }
       if (data.customer_product_name) {
-        formData.customer_product_name = data.customer_product_name;
+        newRow.customer_product_name = data.customer_product_name;
       }
       if (data.product_spec) {
-        formData.product_spec = data.product_spec;
+        newRow.product_spec = data.product_spec;
       }
     }
   } catch (error) {
@@ -444,26 +542,32 @@ const fetchLastPrice = async (purchaserName: string, productName: string) => {
   }
 };
 
-const openAddModal = () => {
-  Object.assign(formData, {
-    id: undefined,
-    purchaser_name: '',
-    product_name: '',
-    product_spec: '',
-    customer_product_name: '',
-    sale_num: 0,
-    sale_price: 0,
-    sale_date: dayjs(),
-    remark: ''
-  });
-  modalTitle.value = '新增销售信息';
-  modalVisible.value = true;
+const fetchEditingRowLastPrice = async (id: number, purchaserName: string, productName: string) => {
+  try {
+    const response = await getLastSalePrice({
+      purchaser_name: purchaserName,
+      product_name: productName
+    });
+    
+    const data = response.data;
+    if (data && editingRows.value[id]) {
+      if (data.sale_price) {
+        editingRows.value[id].sale_price = data.sale_price;
+      }
+      if (data.customer_product_name) {
+        editingRows.value[id].customer_product_name = data.customer_product_name;
+      }
+      if (data.product_spec) {
+        editingRows.value[id].product_spec = data.product_spec;
+      }
+    }
+  } catch (error) {
+    console.error('获取历史单价失败:', error);
+  }
 };
 
-// 检查销售日期是否在已确定的对账单日期范围内
 const checkSaleDateInStatementRange = async (purchaserName: string, saleDate: dayjs.Dayjs) => {
   try {
-    // 获取该采购商的所有已确定对账单
     const response = await request({
       url: '/sale/bill/list',
       method: 'get',
@@ -494,74 +598,136 @@ const checkSaleDateInStatementRange = async (purchaserName: string, saleDate: da
   }
 };
 
-// 提交销售数据
-const submitSaleData = async () => {
-  const submitData = {
-    ...formData,
-    sale_date: typeof formData.sale_date === 'object' && formData.sale_date !== null && typeof (formData.sale_date as any).format === 'function' ? (formData.sale_date as any).format('YYYY-MM-DD') : undefined
-  };
-  
-  if (formData.id) {
-    await updateSaleInfo(submitData as UpdateSaleInfoReq);
-    message.success('操作成功');
-    modalVisible.value = false;
-    fetchData();
-  } else {
-    await addSaleInfo(submitData as AddSaleInfoReq);
-    message.success('操作成功');
-    modalVisible.value = false;
-    fetchData();
+const handleAdd = async () => {
+  if (!newRow.purchaser_name || !newRow.product_name || !newRow.product_spec || !newRow.sale_num || !newRow.sale_price || !newRow.sale_date) {
+    message.error('请填写必填项');
+    return;
   }
-};
 
-const handleSubmit = async () => {
   try {
-    const saleDate = dayjs.isDayjs(formData.sale_date) ? formData.sale_date : dayjs(formData.sale_date);
+    const saleDate = dayjs.isDayjs(newRow.sale_date) ? newRow.sale_date : dayjs(newRow.sale_date);
     
-    // 检查销售日期是否在已确定的对账单日期范围内
-    if (formData.purchaser_name) {
-      const checkResult = await checkSaleDateInStatementRange(formData.purchaser_name, saleDate);
+    if (newRow.purchaser_name) {
+      const checkResult = await checkSaleDateInStatementRange(newRow.purchaser_name, saleDate);
       if (checkResult.inRange) {
         Modal.confirm({
           title: '日期范围提醒',
           content: `您选择的销售日期(${saleDate.format('YYYY-MM-DD')})在已确定的对账单日期范围内(${checkResult.bill.start_date} 至 ${checkResult.bill.end_date})。继续添加可能会导致对账单发生改变，确定要继续吗？`,
           onOk: async () => {
-            await submitSaleData();
+            await submitAdd();
           }
         });
         return;
       }
     }
     
-    await submitSaleData();
+    await submitAdd();
   } catch (error: any) {
-    console.error('提交失败:', error);
+    console.error('添加失败:', error);
     Modal.error({
-      title: '操作失败',
+      title: '添加失败',
       content: error.message || '服务器错误，请稍后重试'
     });
   }
 };
 
-const handleReset = () => {
-  if (!formData.id) {
-    Object.assign(formData, {
-      purchaser_name: '',
-      product_name: '',
-      product_spec: '',
-      customer_product_name: '',
-      sale_num: 0,
-      sale_price: 0,
-      sale_date: dayjs(),
-      remark: ''
+const submitAdd = async () => {
+  const submitData = {
+    ...newRow,
+    sale_date: typeof newRow.sale_date === 'object' && newRow.sale_date !== null && typeof (newRow.sale_date as any).format === 'function' ? (newRow.sale_date as any).format('YYYY-MM-DD') : undefined
+  };
+  
+  delete submitData.key;
+  
+  await addSaleInfo(submitData as AddSaleInfoReq);
+  message.success('添加成功');
+  
+  Object.assign(newRow, {
+    purchaser_name: '',
+    product_name: '',
+    product_spec: '',
+    customer_product_name: '',
+    sale_num: undefined,
+    sale_price: undefined,
+    sale_date: dayjs(),
+    remark: '',
+    purchaser_id: undefined
+  });
+  
+  fetchData();
+};
+
+const handleEdit = (record: any) => {
+  editingRows.value[record.id] = {
+    ...record,
+    sale_date: dayjs(record.sale_date)
+  };
+  editingRowProductOptions.value[record.id] = [...productOptions.value];
+};
+
+const handleCancelEdit = (id: number) => {
+  delete editingRows.value[id];
+  delete editingRowProductOptions.value[id];
+};
+
+const handleSave = async (id: number) => {
+  const row = editingRows.value[id];
+  if (!row.purchaser_name || !row.product_name || !row.product_spec || !row.sale_num || !row.sale_price || !row.sale_date) {
+    message.error('请填写必填项');
+    return;
+  }
+
+  try {
+    const saleDate = dayjs.isDayjs(row.sale_date) ? row.sale_date : dayjs(row.sale_date);
+    
+    if (row.purchaser_name) {
+      const checkResult = await checkSaleDateInStatementRange(row.purchaser_name, saleDate);
+      if (checkResult.inRange) {
+        Modal.confirm({
+          title: '日期范围提醒',
+          content: `您选择的销售日期(${saleDate.format('YYYY-MM-DD')})在已确定的对账单日期范围内(${checkResult.bill.start_date} 至 ${checkResult.bill.end_date})。继续添加可能会导致对账单发生改变，确定要继续吗？`,
+          onOk: async () => {
+            await submitSave(id);
+          }
+        });
+        return;
+      }
+    }
+    
+    await submitSave(id);
+  } catch (error: any) {
+    console.error('保存失败:', error);
+    Modal.error({
+      title: '保存失败',
+      content: error.message || '服务器错误，请稍后重试'
     });
   }
+};
+
+const submitSave = async (id: number) => {
+  const row = editingRows.value[id];
+  const submitData = {
+    id,
+    purchaser_name: row.purchaser_name,
+    product_name: row.product_name,
+    product_spec: row.product_spec,
+    customer_product_name: row.customer_product_name,
+    sale_num: row.sale_num as number,
+    sale_price: row.sale_price as number,
+    sale_date: typeof row.sale_date === 'object' && row.sale_date !== null && typeof (row.sale_date as any).format === 'function' ? (row.sale_date as any).format('YYYY-MM-DD') : undefined,
+    remark: row.remark
+  };
+  
+  await updateSaleInfo(submitData as UpdateSaleInfoReq);
+  message.success('保存成功');
+  delete editingRows.value[id];
+  delete editingRowProductOptions.value[id];
+  fetchData();
 };
 
 const handleDelete = (id: number) => {
   Modal.confirm({
     title: '确认删除',
-    icon: () => h(ExclamationCircleOutlined),
     content: '删除后同步更新对账单、库存及利润，不可恢复',
     okText: '确认',
     cancelText: '取消',
@@ -591,7 +757,7 @@ onMounted(async () => {
           value: name
         }));
       } catch (error) {
-        console.error('获取采购商列表失败:', error);
+        console.error('获取客户列表失败:', error);
       }
     })(),
     (async () => {
@@ -603,9 +769,11 @@ onMounted(async () => {
             value: name
           }));
           searchProductOptions.value = productOptions.value;
+          newRowProductOptions.value = productOptions.value;
         } else {
           productOptions.value = [];
           searchProductOptions.value = [];
+          newRowProductOptions.value = [];
         }
       } catch (error) {
         console.error('获取商品列表失败:', error);
@@ -613,7 +781,6 @@ onMounted(async () => {
     })()
   ]);
   
-  // 检查路由参数id
   const id = route.query.id;
   if (id) {
     fetchData(Number(id));
@@ -628,13 +795,5 @@ onMounted(async () => {
   padding: 20px;
   height: 100%;
   background-color: #f5f5f5;
-}
-
-:deep(.ant-modal-body) {
-  padding: 24px;
-}
-
-:deep(.ant-form-item) {
-  margin-bottom: 16px;
 }
 </style>

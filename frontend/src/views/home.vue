@@ -20,7 +20,7 @@
     </div>
     <div class="chart-card single-chart">
       <div class="chart-header">
-        <h3>营收支出趋势</h3>
+        <h3>营业额支出趋势</h3>
         <a-radio-group v-model:value="timeType" @change="handleTimeTypeChange">
           <a-radio-button value="year">本年</a-radio-button>
           <a-radio-button value="custom">自定义</a-radio-button>
@@ -40,14 +40,14 @@
     <div class="pie-chart-wrap">
       <div class="chart-card pie-chart">
         <div class="chart-header">
-          <h3>采购商利润分布</h3>
+          <h3>客户利润分布</h3>
           <a-radio-group v-model:value="pieTimeType" @change="handlePieTimeTypeChange" size="small">
             <a-radio-button value="all">全部</a-radio-button>
             <a-radio-button value="year">本年</a-radio-button>
             <a-radio-button value="month">本月</a-radio-button>
           </a-radio-group>
         </div>
-        <a-empty v-if="!purchaserProfitData.length" description="暂无采购商利润数据" />
+        <a-empty v-if="!purchaserProfitData.length" description="暂无客户利润数据" />
         <v-chart v-else :option="purchaserPieOption" style="width: 100%; height: 300px" />
       </div>
       <div class="chart-card pie-chart">
@@ -117,7 +117,7 @@ const statisticCard = ref<Record<string, { title: string; value: number }>>({});
 // ========== 响应式数据 - 营收趋势图 ==========
 interface TrendChartItem {
   date: string;
-  营收: number;
+  营业额: number;
   支出: number;
 }
 const trendChartData = ref<TrendChartItem[]>([]);
@@ -136,7 +136,7 @@ const lineChartOption = computed(() => {
       }
     },
     legend: {
-      data: ['营收', '支出'],
+      data: ['营业额', '支出'],
       top: 0
     },
     grid: {
@@ -163,10 +163,10 @@ const lineChartOption = computed(() => {
     },
     series: [
       {
-        name: '营收',
+        name: '营业额',
         type: 'line',
         smooth: true,
-        data: trendChartData.value.map(item => item.营收),
+        data: trendChartData.value.map(item => item.营业额),
         itemStyle: {
           color: '#1890ff'
         }
@@ -193,7 +193,7 @@ interface HomePieChartItem {
 const purchaserProfitData = ref<HomePieChartItem[]>([]);
 const productProfitData = ref<HomePieChartItem[]>([]);
 
-// ECharts 采购商利润饼图配置
+// ECharts 客户利润饼图配置
 const purchaserPieOption = computed(() => {
   return {
     tooltip: {
@@ -206,7 +206,7 @@ const purchaserPieOption = computed(() => {
     },
     series: [
       {
-        name: '采购商利润',
+        name: '客户利润',
         type: 'pie',
         radius: '70%',
         center: ['50%', '50%'],
@@ -301,8 +301,8 @@ interface HomePieChart {
 const formatStatisticCard = (data: HomeStatisticCard) => {
   statisticCard.value = {
     inventory_value: { title: '当前库存总价值', value: data.inventory_value },
-    purchase_unreceived: { title: '采购未结清总额', value: data.purchase_unreceived },
-    sale_unreceived: { title: '销售未结清总额', value: data.sale_unreceived },
+    purchase_unreceived: { title: '应付款', value: data.purchase_unreceived },
+    sale_unreceived: { title: '应收款', value: data.sale_unreceived },
     month_profit: { title: '本月毛利', value: data.month_profit || data.cycle_profit || 0 },
     year_profit: { title: '本年毛利', value: data.year_profit || 0 },
     total_profit: { title: '总毛利', value: data.total_profit || 0 }
@@ -316,7 +316,7 @@ const formatTrendChart = (data: HomeTrendChart) => {
   xAxis.forEach((date: string, index: number) => {
     result.push({
       date,
-      营收: revenue_data[index] || 0,
+      营业额: revenue_data[index] || 0,
       支出: expend_data[index] || 0
     });
   });

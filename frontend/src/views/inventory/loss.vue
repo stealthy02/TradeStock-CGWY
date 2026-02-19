@@ -2,13 +2,6 @@
   <div class="page-container">
     <h1>库存报损录入/查询</h1>
     
-    <div class="action-bar">
-      <a-button type="primary" @click="openAddModal">
-        <template #icon><PlusOutlined /></template>
-        新建库存报损
-      </a-button>
-    </div>
-    
     <a-form
       v-if="showSearch"
       :model="searchParams"
@@ -50,12 +43,153 @@
     
     <a-table
       :columns="columns"
-      :data-source="dataSource"
-      :row-key="(record) => record.id"
+      :data-source="tableDataSource"
+      :row-key="(record) => record.key || record.id"
       :pagination="false"
       :scroll="{ x: 1400 }"
       :loading="loading"
-    />
+    >
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'product_name'">
+          <template v-if="record.key === 'new-row'">
+            <a-select
+              v-model:value="newRow.product_name"
+              placeholder="请选择商品"
+              show-search
+              :filter-option="false"
+              :options="productOptions"
+              @search="handleProductSearch"
+              @focus="handleProductFocus"
+              @change="handleNewRowProductChange"
+              style="width: 100%"
+            />
+            <div v-if="newRowCurrentInventory" style="margin-top: 8px; color: #52c41a; font-size: 12px">
+              当前库存：{{ newRowCurrentInventory.inventory_num }}
+            </div>
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-select
+              v-model:value="editingRows[record.id].product_name"
+              placeholder="请选择商品"
+              show-search
+              :filter-option="false"
+              :options="productOptions"
+              @search="handleProductSearch"
+              @change="(val: any) => handleEditingRowProductChange(record.id, val)"
+              style="width: 100%"
+            />
+            <div v-if="editingRowCurrentInventory[record.id]" style="margin-top: 8px; color: #52c41a; font-size: 12px">
+              当前库存：{{ editingRowCurrentInventory[record.id]?.inventory_num }}
+            </div>
+          </template>
+          <template v-else>{{ record.product_name }}</template>
+        </template>
+        <template v-else-if="column.key === 'product_spec'">
+          <template v-if="record.key === 'new-row'">
+            <a-input
+              v-model:value="newRow.product_spec"
+              placeholder="请输入商品规格，例如：30"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-input
+              v-model:value="editingRows[record.id].product_spec"
+              placeholder="请输入商品规格，例如：30"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else>{{ record.product_spec }}</template>
+        </template>
+        <template v-else-if="column.key === 'loss_num'">
+          <template v-if="record.key === 'new-row'">
+            <a-input-number
+              v-model:value="newRow.loss_num"
+              :min="1"
+              :step="1"
+              :precision="0"
+              placeholder="请输入报损数量"
+              style="width: 100%"
+            />
+            <div v-if="newRowInventoryError" style="color: #ff4d4f; font-size: 12px; margin-top: 4px">
+              {{ newRowInventoryError }}
+            </div>
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-input-number
+              v-model:value="editingRows[record.id].loss_num"
+              :min="1"
+              :step="1"
+              :precision="0"
+              placeholder="请输入报损数量"
+              style="width: 100%"
+            />
+            <div v-if="editingRowInventoryError[record.id]" style="color: #ff4d4f; font-size: 12px; margin-top: 4px">
+              {{ editingRowInventoryError[record.id] }}
+            </div>
+          </template>
+          <template v-else>{{ record.loss_num }}</template>
+        </template>
+        <template v-else-if="column.key === 'lossUnitCost'">
+          <template v-if="record.key === 'new-row'">-</template>
+          <template v-else-if="record.isEditing">-</template>
+          <template v-else>{{ record.lossUnitCost?.toFixed(2) || '0.00' }}</template>
+        </template>
+        <template v-else-if="column.key === 'losstotal_cost'">
+          <template v-if="record.key === 'new-row'">-</template>
+          <template v-else-if="record.isEditing">-</template>
+          <template v-else>{{ record.losstotal_cost?.toFixed(2) || '0.00' }}</template>
+        </template>
+        <template v-else-if="column.key === 'loss_date'">
+          <template v-if="record.key === 'new-row'">
+            <a-date-picker
+              v-model:value="newRow.loss_date"
+              format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-date-picker
+              v-model:value="editingRows[record.id].loss_date"
+              format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else>{{ record.loss_date }}</template>
+        </template>
+        <template v-else-if="column.key === 'loss_reason'">
+          <template v-if="record.key === 'new-row'">
+            <a-textarea
+              v-model:value="newRow.loss_reason"
+              :rows="1"
+              :maxLength="200"
+              placeholder="请输入报损原因（如：损坏/过期/丢失）"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-textarea
+              v-model:value="editingRows[record.id].loss_reason"
+              :rows="1"
+              :maxLength="200"
+              placeholder="请输入报损原因（如：损坏/过期/丢失）"
+            />
+          </template>
+          <template v-else>{{ record.loss_reason || '-' }}</template>
+        </template>
+        <template v-else-if="column.key === 'action'">
+          <template v-if="record.key === 'new-row'">
+            <a-button type="primary" size="small" @click="handleAdd" style="background-color: #52c41a; border-color: #52c41a">添</a-button>
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-button type="primary" size="small" @click="handleSave" style="margin-right: 8px">保</a-button>
+            <a-button size="small" @click="handleCancelEdit(record.id)">取</a-button>
+          </template>
+          <template v-else>
+            <a-button size="small" danger @click="handleDelete(record.id)">删</a-button>
+          </template>
+        </template>
+      </template>
+    </a-table>
     
     <a-pagination
       v-if="total > 0"
@@ -68,86 +202,12 @@
       @change="handlePageChange"
       @show-size-change="handlePageSizeChange"
     />
-    
-    <a-modal
-      v-model:open="modalVisible"
-      :title="modalTitle"
-      width="600px"
-      destroyOnClose
-      :footer="null"
-    >
-      <a-form
-        ref="formRef"
-        :model="formData"
-        :rules="formRules"
-        layout="vertical"
-      >
-        <a-form-item label="商品名称" name="product_name">
-          <a-select
-            v-model:value="formData.product_name"
-            placeholder="请选择商品"
-            show-search
-            :filter-option="false"
-            :options="productOptions"
-            @search="handleProductSearch"
-            @focus="handleProductFocus"
-            @change="handleProductChange"
-            style="width: 100%"
-          />
-          <div v-if="currentInventory" style="margin-top: 8px; color: #52c41a; font-size: 12px">
-            当前库存：{{ currentInventory.inventory_num }}
-          </div>
-        </a-form-item>
-        <a-form-item label="商品规格" name="product_spec">
-          <a-input
-            v-model:value="formData.product_spec"
-            placeholder="请输入商品规格，例如：30"
-            style="width: 100%"
-          />
-        </a-form-item>
-        <a-form-item label="报损数量" name="loss_num">
-          <a-input-number
-            v-model:value="formData.loss_num"
-            :min="1"
-            :step="1"
-            :precision="0"
-            placeholder="请输入报损数量"
-            style="width: 100%"
-          />
-          <div v-if="inventoryError" style="color: #ff4d4f; font-size: 12px; margin-top: 4px">
-            {{ inventoryError }}
-          </div>
-        </a-form-item>
-        <a-form-item label="报损日期" name="loss_date">
-          <a-date-picker
-            v-model:value="formData.loss_date"
-            format="YYYY-MM-DD"
-            style="width: 100%"
-          />
-        </a-form-item>
-        <a-form-item label="报损原因" name="loss_reason">
-          <a-textarea
-            v-model:value="formData.loss_reason"
-            :rows="4"
-            :maxLength="200"
-            placeholder="请输入报损原因（如：损坏/过期/丢失）"
-            show-word-limit
-          />
-        </a-form-item>
-        <a-form-item style="margin-top: 24px">
-          <a-button type="primary" @click="handleSubmit">提交</a-button>
-          <a-button style="margin-left: 8px" @click="handleReset">重置</a-button>
-          <a-button style="margin-left: 8px" @click="modalVisible = false">取消</a-button>
-        </a-form-item>
-      </a-form>
-    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, h } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { PlusOutlined, ExclamationCircleOutlined } from '@ant-design/icons-vue';
 import { message, Modal } from 'ant-design-vue';
 import dayjs from 'dayjs';
 import type { InventoryLossItem, AddInventoryLossReq, InventoryLossListQuery, InventoryItem } from '@/types';
@@ -159,29 +219,29 @@ import {
 } from '@/api/inventory';
 import { getInventoryList } from '@/api/inventory';
 
-const modalVisible = ref(false);
-const modalTitle = ref('新建库存报损');
 const showSearch = ref(true);
 const dateRange = ref<any>([]);
 const dataSource = ref<any[]>([]);
 const total = ref(0);
 const loading = ref(false);
-const formRef = ref<any>();
 const lossReason = ref('');
+const editingRows = ref<Record<number, any>>({});
+const newRowCurrentInventory = ref<InventoryItem | null>(null);
+const newRowInventoryError = ref('');
+const editingRowCurrentInventory = ref<Record<number, InventoryItem | null>>({});
+const editingRowInventoryError = ref<Record<number, string>>({});
 
-// 路由实例
 const route = useRoute();
 
 const productOptions = ref<{ label: string; value: string }[]>([]);
-const currentInventory = ref<InventoryItem | null>(null);
-const inventoryError = ref('');
 
 const searchParams = reactive<InventoryLossListQuery>({
   page_num: 1,
   page_size: 10
 });
 
-const formData = reactive<(Omit<AddInventoryLossReq, 'loss_date'> & { loss_date?: any; id?: number })>({
+const newRow = reactive<any>({
+  key: 'new-row',
   product_name: '',
   product_spec: '',
   loss_num: 1,
@@ -189,44 +249,14 @@ const formData = reactive<(Omit<AddInventoryLossReq, 'loss_date'> & { loss_date?
   loss_reason: ''
 });
 
-const formRules = reactive<any>({
-  product_name: [
-    { required: true, message: '请选择商品', trigger: ['blur', 'change'] },
-    {
-      validator: (_rule: any, value: string) => {
-        if (!value) return Promise.resolve();
-        const exists = productOptions.value.some(opt => opt.value === value);
-        if (!exists) {
-          return Promise.reject('商品不存在，请选择已存在的商品');
-        }
-        return Promise.resolve();
-      },
-      trigger: ['blur', 'change']
-    }
-  ],
-  product_spec: [
-    { required: true, message: '请输入商品规格', trigger: ['blur', 'change'] }
-  ],
-  loss_num: [
-    { required: true, message: '请输入报损数量', trigger: ['blur', 'change'] },
-    { type: 'number', min: 1, message: '报损数量必须为正整数', trigger: ['blur', 'change'] },
-    {
-      validator: (_rule: any, value: number) => {
-        if (!value) return Promise.resolve();
-        if (currentInventory.value && value > currentInventory.value.inventory_num) {
-          return Promise.reject(`库存不足，当前${formData.product_name}库存为${currentInventory.value.inventory_num}`);
-        }
-        return Promise.resolve();
-      },
-      trigger: ['blur', 'change']
-    }
-  ],
-  loss_date: [
-    { required: true, message: '请选择报损日期', trigger: ['change'] }
-  ]
+const tableDataSource = computed(() => {
+  const result: any[] = [{ ...newRow }];
+  dataSource.value.forEach(item => {
+    const isEditing = !!editingRows.value[item.id];
+    result.push({ ...item, isEditing });
+  });
+  return result;
 });
-
-
 
 const columns = computed(() => [
   {
@@ -260,8 +290,7 @@ const columns = computed(() => [
     key: 'lossUnitCost', 
     sorter: true, 
     ellipsis: true, 
-    width: 150,
-    customRender: (opt: any) => opt.record.lossUnitCost?.toFixed(2) || '0.00'
+    width: 150
   },
   { 
     title: '报损总成本', 
@@ -269,8 +298,7 @@ const columns = computed(() => [
     key: 'losstotal_cost', 
     sorter: true, 
     ellipsis: true, 
-    width: 150,
-    customRender: (opt: any) => opt.record.losstotal_cost?.toFixed(2) || '0.00'
+    width: 150
   },
   {
     title: '报损日期',
@@ -285,33 +313,13 @@ const columns = computed(() => [
     dataIndex: 'loss_reason',
     key: 'loss_reason',
     ellipsis: true,
-    width: 150,
-    customRender: (opt: { record: InventoryLossItem }) => {
-      const reason = opt.record.loss_reason;
-      return reason || '-';
-    }
+    width: 150
   },
   {
     title: '操作',
     key: 'action',
     fixed: 'right' as const,
-    width: 120,
-    customRender: ({ record }: { record: InventoryLossItem }) => {
-      return h('div', [
-        h('span', {
-          style: {
-            display: 'inline-block',
-            padding: '2px 8px',
-            backgroundColor: '#ff4d4f',
-            color: '#fff',
-            borderRadius: '2px',
-            cursor: 'pointer',
-            fontSize: '12px'
-          },
-          onClick: () => handleDelete(record.id)
-        }, '删')
-      ]);
-    }
+    width: 160
   }
 ]) as any;
 
@@ -393,100 +401,120 @@ const handleProductFocus = async () => {
   }
 };
 
-const handleProductChange = async (value: SelectValue) => {
+const getInventoryByProductName = async (productName: string): Promise<InventoryItem | null> => {
+  try {
+    const response = await getInventoryList({ product_name: productName, page_size: 1 });
+    if (Array.isArray(response.data.list) && response.data.list.length > 0) {
+      return response.data.list[0];
+    }
+    return null;
+  } catch (error) {
+    console.error('获取商品库存失败:', error);
+    return null;
+  }
+};
+
+const handleNewRowProductChange = async (value: SelectValue) => {
   if (!value) {
-    currentInventory.value = null;
-    inventoryError.value = '';
+    newRowCurrentInventory.value = null;
+    newRowInventoryError.value = '';
     return;
   }
   
-  try {
-    const response = await getInventoryList({ product_name: value as string, page_size: 1 });
-    if (Array.isArray(response.data.list) && response.data.list.length > 0) {
-      currentInventory.value = response.data.list[0];
-      inventoryError.value = '';
-      
-      if (currentInventory.value && formData.loss_num > currentInventory.value.inventory_num) {
-        inventoryError.value = `库存不足，当前${value}库存为${currentInventory.value.inventory_num}`;
-      }
-    } else {
-      currentInventory.value = null;
-      inventoryError.value = '商品不存在';
+  const inventory = await getInventoryByProductName(value as string);
+  if (inventory) {
+    newRowCurrentInventory.value = inventory;
+    newRowInventoryError.value = '';
+    newRow.product_spec = inventory.product_spec;
+    
+    if (newRow.loss_num > inventory.inventory_num) {
+      newRowInventoryError.value = `库存不足，当前${value}库存为${inventory.inventory_num}`;
     }
-  } catch (error) {
-    console.error('获取商品库存失败:', error);
-    currentInventory.value = null;
+  } else {
+    newRowCurrentInventory.value = null;
+    newRowInventoryError.value = '商品不存在';
   }
 };
 
-const openAddModal = () => {
-  Object.assign(formData, {
-    id: undefined,
-    product_name: '',
-    product_spec: '',
-    loss_num: 1,
-    loss_date: dayjs(),
-    loss_reason: ''
-  });
-  currentInventory.value = null;
-  inventoryError.value = '';
-  modalTitle.value = '新建库存报损';
-  modalVisible.value = true;
+const handleEditingRowProductChange = async (id: number, value: SelectValue) => {
+  if (!value) {
+    editingRowCurrentInventory.value[id] = null;
+    editingRowInventoryError.value[id] = '';
+    return;
+  }
+  
+  const inventory = await getInventoryByProductName(value as string);
+  if (inventory) {
+    editingRowCurrentInventory.value[id] = inventory;
+    editingRowInventoryError.value[id] = '';
+    if (editingRows.value[id]) {
+      editingRows.value[id].product_spec = inventory.product_spec;
+      
+      if (editingRows.value[id].loss_num > inventory.inventory_num) {
+        editingRowInventoryError.value[id] = `库存不足，当前${value}库存为${inventory.inventory_num}`;
+      }
+    }
+  } else {
+    editingRowCurrentInventory.value[id] = null;
+    editingRowInventoryError.value[id] = '商品不存在';
+  }
 };
 
+const handleAdd = async () => {
+  if (!newRow.product_name || !newRow.product_spec || !newRow.loss_num || !newRow.loss_date) {
+    message.error('请填写必填项');
+    return;
+  }
 
+  if (newRowCurrentInventory.value && newRow.loss_num > newRowCurrentInventory.value.inventory_num) {
+    message.error(`库存不足，当前${newRow.product_name}库存为${newRowCurrentInventory.value.inventory_num}`);
+    return;
+  }
 
-const handleSubmit = async () => {
-  if (!formRef.value) return;
-  
   try {
-    await formRef.value.validate();
-    
-    if (currentInventory.value && formData.loss_num > currentInventory.value.inventory_num) {
-      message.error(`库存不足，当前${formData.product_name}库存为${currentInventory.value.inventory_num}`);
-      return;
-    }
-    
     const submitData = {
-      ...formData,
-      loss_date: typeof formData.loss_date === 'object' && formData.loss_date !== null && typeof (formData.loss_date as any).format === 'function' ? (formData.loss_date as any).format('YYYY-MM-DD') : undefined
+      ...newRow,
+      loss_date: typeof newRow.loss_date === 'object' && newRow.loss_date !== null && typeof (newRow.loss_date as any).format === 'function' ? (newRow.loss_date as any).format('YYYY-MM-DD') : undefined
     };
+    
+    delete submitData.key;
     
     await addInventoryLoss(submitData as AddInventoryLossReq);
     message.success('报损成功，已自动扣减库存');
-    modalVisible.value = false;
-    fetchData();
-  } catch (error: any) {
-    console.error('提交失败:', error);
-    if (error.errorFields) {
-      message.error('请检查表单填写是否正确');
-    } else {
-      Modal.error({
-        title: '操作失败',
-        content: error.message || '服务器错误，请稍后重试'
-      });
-    }
-  }
-};
-
-const handleReset = () => {
-  if (!formData.id) {
-    Object.assign(formData, {
+    
+    Object.assign(newRow, {
       product_name: '',
       product_spec: '',
       loss_num: 1,
       loss_date: dayjs(),
       loss_reason: ''
     });
-    currentInventory.value = null;
-    inventoryError.value = '';
+    newRowCurrentInventory.value = null;
+    newRowInventoryError.value = '';
+    
+    fetchData();
+  } catch (error: any) {
+    console.error('添加失败:', error);
+    Modal.error({
+      title: '添加失败',
+      content: error.message || '服务器错误，请稍后重试'
+    });
   }
+};
+
+const handleCancelEdit = (id: number) => {
+  delete editingRows.value[id];
+  delete editingRowCurrentInventory.value[id];
+  delete editingRowInventoryError.value[id];
+};
+
+const handleSave = async () => {
+  message.warning('库存报损不支持编辑');
 };
 
 const handleDelete = (id: number) => {
   Modal.confirm({
     title: '确认删除',
-    icon: () => h(ExclamationCircleOutlined),
     content: '删除后将恢复库存，是否确认删除？',
     okText: '确认',
     cancelText: '取消',
@@ -506,14 +534,9 @@ const handleDelete = (id: number) => {
   });
 };
 
-
-
-
-
 onMounted(async () => {
   await handleProductFocus();
   
-  // 检查路由参数id
   const id = route.query.id;
   if (id) {
     fetchData(Number(id));
@@ -534,13 +557,5 @@ onMounted(async () => {
   margin-bottom: 16px;
   display: flex;
   gap: 8px;
-}
-
-:deep(.ant-modal-body) {
-  padding: 24px;
-}
-
-:deep(.ant-form-item) {
-  margin-bottom: 16px;
 }
 </style>

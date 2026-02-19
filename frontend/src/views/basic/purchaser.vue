@@ -2,9 +2,9 @@
   <div class="page-container">
     <!-- 原生Antd面包屑+页面头部 -->
     <a-page-header
-      title="采购商信息管理"
+      title="客户信息管理"
       :breadcrumb="{
-        routes: [{ path: '', name: '基础信息管理' }, { path: '', name: '采购商信息' }]
+        routes: [{ path: '', name: '基础信息管理' }, { path: '', name: '客户信息' }]
       }"
       style="margin-bottom: 20px"
     >
@@ -12,7 +12,7 @@
         <a-space size="middle">
           <a-input-search
             v-model:value="simpleSearchKey"
-            placeholder="请输入采购商名模糊搜索"
+            placeholder="请输入客户名模糊搜索"
             allow-clear
             style="width: 300px"
             @search="handleSearch"
@@ -21,7 +21,7 @@
             高级搜索
           </a-button>
           <a-button type="primary" icon="plus" @click="openAddDrawer">
-            新增采购商
+            新增客户
           </a-button>
           <a-button
             type="default"
@@ -42,11 +42,11 @@
       <a-row :gutter="[24, 24]" v-else>
         <a-col :span="24" v-if="purchaserList.length === 0">
           <Empty
-            description="暂无采购商信息，点击右上角「新增采购商」添加"
+            description="暂无客户信息，点击右上角「新增客户」添加"
             style="margin: 40px 0"
           >
             <a-button type="primary" icon="plus" @click="openAddDrawer">
-              新增采购商
+              新增客户
             </a-button>
           </Empty>
         </a-col>
@@ -74,7 +74,7 @@
 
             <div class="card-body">
               <div class="info-item">
-                <span class="label">采购商名：</span>
+                <span class="label">客户名：</span>
                 <span class="value">{{ item.purchaser_name }}</span>
               </div>
               <div class="info-item">
@@ -139,10 +139,10 @@
         layout="vertical"
         @finish="handleAdvancedSearch"
       >
-        <a-form-item label="采购商名" name="purchaser_name">
+        <a-form-item label="客户名" name="purchaser_name">
           <a-input
             v-model:value="advancedQuery.purchaser_name"
-            placeholder="请输入采购商名"
+            placeholder="请输入客户名"
             allow-clear
           />
         </a-form-item>
@@ -166,7 +166,7 @@
 
     <!-- 新增/编辑抽屉 -->
     <a-drawer
-      :title="isEdit ? '编辑采购商' : '新增采购商'"
+      :title="isEdit ? '编辑客户' : '新增客户'"
       :open="formDrawerVisible"
       width="600px"
       destroy-on-close
@@ -179,7 +179,7 @@
         layout="vertical"
         @finish="handleFormSubmit"
       >
-        <a-form-item label="采购商头像" name="avatar">
+        <a-form-item label="客户头像" name="avatar">
           <a-upload
             :action="uploadApi"
             list-type="picture-card"
@@ -196,10 +196,10 @@
           </a-upload>
         </a-form-item>
 
-        <a-form-item label="采购商名" name="purchaser_name">
+        <a-form-item label="客户名" name="purchaser_name">
           <a-input
             v-model:value="formData.purchaser_name"
-            placeholder="请输入采购商名"
+            placeholder="请输入客户名"
             allow-clear
             :maxlength="50"
             show-word-limit
@@ -392,7 +392,7 @@ const deleteTargetId = ref<number | number[]>(0);
 // ===================== 表单校验规则 =====================
 const formRules = reactive<Record<string, RuleObject[]>>({
   purchaser_name: [
-    { type: 'string', required: true, message: '请输入采购商名', trigger: 'blur' },
+    { type: 'string', required: true, message: '请输入客户名', trigger: 'blur' },
     { type: 'string', min: 2, max: 50, message: '名称长度2-50字符', trigger: 'blur' },
   ],
   contact_person: [
@@ -411,7 +411,7 @@ onMounted(() => {
 });
 
 // ===================== 核心方法 =====================
-// 获取采购商列表：对齐你的api调用风格，直接取res.data
+// 获取客户列表：对齐你的api调用风格，直接取res.data
 const getPurchaserData = async () => {
   loading.value = true;
   try {
@@ -477,7 +477,7 @@ const openEditDrawer = (item: PurchaserItem) => {
   formDrawerVisible.value = true;
   resetForm();
   Object.assign(formData, item);
-  // 头像回显：用采购商ID做唯一uid，无额外依赖
+  // 头像回显：用客户ID做唯一uid，无额外依赖
   if (item.avatar_url) {
     avatarFileList.value = [{
       uid: `${item.id}_avatar`,
@@ -567,12 +567,12 @@ const handleFormSubmit = async () => {
 // 删除方法：单条/批量
 const handleSingleDelete = (id: number) => {
   deleteTargetId.value = id;
-  deleteModalText.value = '确定删除该采购商吗？删除后不可恢复！';
+  deleteModalText.value = '确定删除该客户吗？删除后不可恢复！';
   deleteModalVisible.value = true;
 };
 const handleBatchDelete = () => {
   deleteTargetId.value = selectedKeys.value;
-  deleteModalText.value = `确定删除选中的${selectedKeys.value.length}个采购商吗？`;
+  deleteModalText.value = `确定删除选中的${selectedKeys.value.length}个客户吗？`;
   deleteModalVisible.value = true;
 };
 const closeDeleteModal = () => deleteModalVisible.value = false;

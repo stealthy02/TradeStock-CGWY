@@ -143,7 +143,7 @@ const menuList: MenuOption[] = [
     icon: ProfileOutlined,
     children: [
       { path: '/layout/basic/supplier', title: '供货商信息' },
-      { path: '/layout/basic/purchaser', title: '采购商信息' }
+      { path: '/layout/basic/purchaser', title: '客户信息' }
     ]
   },
   {

@@ -43,6 +43,7 @@ declare module 'vue' {
     ATable: typeof import('ant-design-vue/es')['Table']
     ATag: typeof import('ant-design-vue/es')['Tag']
     ATextarea: typeof import('ant-design-vue/es')['Textarea']
+    ATooltip: typeof import('ant-design-vue/es')['Tooltip']
     AUpload: typeof import('ant-design-vue/es')['Upload']
     Empty: typeof import('./components/Common/Empty.vue')['default']
     Header: typeof import('./components/Common/Header.vue')['default']

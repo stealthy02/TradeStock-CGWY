@@ -11,10 +11,10 @@
       layout="inline"
       style="margin-bottom: 16px; padding: 16px; background: #fafafa; border-radius: 8px"
     >
-      <a-form-item label="采购商名称">
+      <a-form-item label="客户名称">
         <a-select
           v-model:value="searchParams.purchaser_name"
-          placeholder="请选择采购商"
+          placeholder="请选择客户"
           show-search
           :filter-option="false"
           :options="purchaserOptions"
@@ -106,7 +106,7 @@
       </template>
       <div v-if="currentBill">
         <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #f0f0f0">
-          <p><strong>采购商名称：</strong>{{ currentBill.purchaser_name || '-' }}</p>
+          <p><strong>客户名称：</strong>{{ currentBill.purchaser_name || '-' }}</p>
           <p><strong>对账开始日期：</strong>{{ currentBill.start_date || '-' }}</p>
           <p><strong>对账结束日期：</strong>
             <template v-if="!currentBill.end_date">
@@ -390,7 +390,7 @@ const previewUnreceivedAmount = ref(null);
 // 表格列定义
 const columns = [
   {
-    title: '采购商名称',
+    title: '客户名称',
     dataIndex: 'purchaser_name',
     key: 'purchaser_name',
     sorter: true,
@@ -862,7 +862,7 @@ const handleExportSubmit = async () => {
   }
 };
 
-// 采购商搜索
+// 客户搜索
 const handlePurchaserSearch = async (value) => {
   if (!value) return;
   try {
@@ -876,7 +876,7 @@ const handlePurchaserSearch = async (value) => {
       value: item.purchaser_name
     }));
   } catch (error) {
-    console.error('获取采购商列表失败:', error);
+    console.error('获取客户列表失败:', error);
   }
 };
 
@@ -912,7 +912,7 @@ const handleDeleteStatement = async (record) => {
   if (!record.end_date) return;
   
   try {
-    // 检查该对账单是否是该采购商的最近一次已确定对账单
+    // 检查该对账单是否是该客户的最近一次已确定对账单
     const response = await request({
       url: '/sale/statement/last',
       method: 'get',
@@ -922,7 +922,7 @@ const handleDeleteStatement = async (record) => {
     });
     
     if (response.data && response.data.id && response.data.id !== record.id) {
-      message.warning('只能删除每个采购商已确定的最近一次对账单');
+      message.warning('只能删除每个客户已确定的最近一次对账单');
       return;
     }
     
@@ -1052,7 +1052,7 @@ const handleConfirmStatementSubmit = async () => {
     if (confirmStatementId.value === 0) {
       const purchaserName = currentBill.value.purchaser_name;
       if (!purchaserName) {
-        message.error('无法获取采购商信息，请稍后重试');
+        message.error('无法获取客户信息，请稍后重试');
         return;
       }
       
@@ -1129,7 +1129,7 @@ onMounted(async () => {
           value: item.purchaser_name
         }));
       } catch (error) {
-        console.error('获取采购商列表失败:', error);
+        console.error('获取客户列表失败:', error);
       }
     })()
   ]);

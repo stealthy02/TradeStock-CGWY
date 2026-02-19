@@ -37,7 +37,7 @@ const routes: Array<RouteRecordRaw> = [
         meta: { title: '基础信息管理', icon: 'ProfileOutlined' },
         children: [
           { path: 'supplier', meta: { title: '供货商信息' }, component: () => import('@/views/basic/supplier.vue') },
-          { path: 'purchaser', meta: { title: '采购商信息' }, component: () => import('@/views/basic/purchaser.vue') }
+          { path: 'purchaser', meta: { title: '客户信息' }, component: () => import('@/views/basic/purchaser.vue') }
         ]
       },
       // 3. 采购管理（折叠父菜单+二级子菜单）

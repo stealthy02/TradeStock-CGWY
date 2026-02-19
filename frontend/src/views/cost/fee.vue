@@ -2,11 +2,6 @@
   <div class="page-container">
     <h1>运营杂费录入/查询</h1>
     
-    <a-button type="primary" style="margin-bottom: 16px" @click="openAddModal">
-      <template #icon><PlusOutlined /></template>
-      新增运营杂费
-    </a-button>
-    
     <a-form
       v-if="showSearch"
       :model="searchParams"
@@ -50,8 +45,8 @@
     
     <a-table
       :columns="columns"
-      :data-source="dataSource"
-      :row-key="(record) => record.id"
+      :data-source="tableDataSource"
+      :row-key="(record) => record.key || record.id"
       :pagination="{
         showSizeChanger: true,
         pageSizeOptions: [10, 20, 50, 100],
@@ -63,80 +58,144 @@
       }"
       :scroll="{ x: 1200 }"
       :loading="loading"
-    />
-    
-    <a-modal
-      v-model:open="modalVisible"
-      :title="modalTitle"
-      width="600px"
-      destroyOnClose
-      :footer="null"
     >
-      <a-form
-        :model="formData"
-        :rules="formRules"
-        layout="vertical"
-      >
-        <a-form-item label="费用描述" name="fee_desc">
-          <a-input
-            v-model:value="formData.fee_desc"
-            placeholder="请输入费用描述（≤50字）"
-            :maxLength="50"
-            show-word-limit
-          />
-        </a-form-item>
-        <a-form-item label="费用金额" name="fee_amount">
-          <a-input-number
-            v-model:value="formData.fee_amount"
-            :min="0.01"
-            :step="0.01"
-            :precision="2"
-            placeholder="请输入费用金额"
-            style="width: 100%"
-          />
-        </a-form-item>
-        <a-form-item label="费用日期" name="fee_date">
-          <a-date-picker
-            v-model:value="formData.fee_date"
-            format="YYYY-MM-DD"
-            style="width: 100%"
-          />
-        </a-form-item>
-        <a-form-item label="费用类型" name="fee_type">
-          <a-select
-            v-model:value="formData.fee_type"
-            placeholder="请选择费用类型"
-            style="width: 100%"
-          >
-            <a-select-option value="房租">房租</a-select-option>
-            <a-select-option value="水电">水电</a-select-option>
-            <a-select-option value="人工">人工</a-select-option>
-            <a-select-option value="物流">物流</a-select-option>
-            <a-select-option value="其他">其他</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="备注" name="remark">
-          <a-textarea
-            v-model:value="formData.remark"
-            :rows="4"
-            :maxLength="200"
-            placeholder="请输入备注信息"
-          />
-        </a-form-item>
-        <a-form-item style="margin-top: 24px">
-          <a-button type="primary" @click="handleSubmit">提交</a-button>
-          <a-button style="margin-left: 8px" @click="handleReset">重置</a-button>
-          <a-button style="margin-left: 8px" @click="modalVisible = false">取消</a-button>
-        </a-form-item>
-      </a-form>
-    </a-modal>
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'fee_desc'">
+          <template v-if="record.key === 'new-row'">
+            <a-input
+              v-model:value="newRow.fee_desc"
+              placeholder="请输入费用描述（≤50字）"
+              :maxLength="50"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-input
+              v-model:value="editingRows[record.id].fee_desc"
+              placeholder="请输入费用描述（≤50字）"
+              :maxLength="50"
+            />
+          </template>
+          <template v-else>{{ record.fee_desc }}</template>
+        </template>
+        <template v-else-if="column.key === 'fee_amount'">
+          <template v-if="record.key === 'new-row'">
+            <a-input-number
+              v-model:value="newRow.fee_amount"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              placeholder="请输入费用金额"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-input-number
+              v-model:value="editingRows[record.id].fee_amount"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              placeholder="请输入费用金额"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else>{{ record.fee_amount?.toFixed(2) }}</template>
+        </template>
+        <template v-else-if="column.key === 'fee_date'">
+          <template v-if="record.key === 'new-row'">
+            <a-date-picker
+              v-model:value="newRow.fee_date"
+              format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-date-picker
+              v-model:value="editingRows[record.id].fee_date"
+              format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </template>
+          <template v-else>{{ record.fee_date }}</template>
+        </template>
+        <template v-else-if="column.key === 'fee_type_text'">
+          <template v-if="record.key === 'new-row'">
+            <a-select
+              v-model:value="newRow.fee_type"
+              placeholder="请选择费用类型"
+              style="width: 100%"
+            >
+              <a-select-option value="房租">房租</a-select-option>
+              <a-select-option value="水电">水电</a-select-option>
+              <a-select-option value="人工">人工</a-select-option>
+              <a-select-option value="物流">物流</a-select-option>
+              <a-select-option value="其他">其他</a-select-option>
+            </a-select>
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-select
+              v-model:value="editingRows[record.id].fee_type"
+              placeholder="请选择费用类型"
+              style="width: 100%"
+            >
+              <a-select-option value="房租">房租</a-select-option>
+              <a-select-option value="水电">水电</a-select-option>
+              <a-select-option value="人工">人工</a-select-option>
+              <a-select-option value="物流">物流</a-select-option>
+              <a-select-option value="其他">其他</a-select-option>
+            </a-select>
+          </template>
+          <template v-else>{{ record.fee_type_text }}</template>
+        </template>
+        <template v-else-if="column.key === 'remark'">
+          <template v-if="record.key === 'new-row'">
+            <a-textarea
+              v-model:value="newRow.remark"
+              :rows="1"
+              :maxLength="200"
+              placeholder="请输入备注信息"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-textarea
+              v-model:value="editingRows[record.id].remark"
+              :rows="1"
+              :maxLength="200"
+              placeholder="请输入备注信息"
+            />
+          </template>
+          <template v-else>
+            <a-tooltip :title="record.remark" v-if="record.remark">
+              {{ record.remark.length > 4 ? record.remark.substring(0, 4) + '...' : record.remark }}
+            </a-tooltip>
+            <template v-else>-</template>
+          </template>
+        </template>
+        <template v-else-if="column.key === 'create_time'">
+          <template v-if="record.key === 'new-row'">-</template>
+          <template v-else-if="record.isEditing">-</template>
+          <template v-else>{{ record.create_time }}</template>
+        </template>
+        <template v-else-if="column.key === 'action'">
+          <template v-if="record.key === 'new-row'">
+            <a-button type="primary" size="small" @click="handleAdd" style="background-color: #52c41a; border-color: #52c41a">添</a-button>
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-button type="primary" size="small" @click="handleSave(record.id)" style="margin-right: 8px">保</a-button>
+            <a-button size="small" @click="handleCancelEdit(record.id)">取</a-button>
+          </template>
+          <template v-else>
+            <a-button size="small" @click="handleEdit(record)" style="margin-right: 8px">编</a-button>
+            <a-button size="small" danger @click="handleDelete(record.id)">删</a-button>
+          </template>
+        </template>
+      </template>
+    </a-table>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, h } from 'vue';
-import { PlusOutlined, ExclamationCircleOutlined } from '@ant-design/icons-vue';
-import { message, Modal, Tooltip } from 'ant-design-vue';
+import { ref, reactive, computed, onMounted } from 'vue';
+import { message, Modal } from 'ant-design-vue';
 import dayjs from 'dayjs';
 import type { CostFeeItem, AddCostFeeReq, UpdateCostFeeReq, CostFeeListQuery } from '@/types';
 import {
@@ -146,44 +205,34 @@ import {
   deleteCostFee
 } from '@/api/cost';
 
-const modalVisible = ref(false);
-const modalTitle = ref('新增运营杂费');
 const showSearch = ref(true);
 const dateRange = ref<any>([]);
 const dataSource = ref<any[]>([]);
 const total = ref(0);
 const loading = ref(false);
+const editingRows = ref<Record<number, any>>({});
 
 const searchParams = reactive<CostFeeListQuery>({
   page_num: 1,
   page_size: 10
 });
 
-const formData = reactive<AddCostFeeReq & Partial<UpdateCostFeeReq>>(
-  {
-    fee_desc: '',
-    fee_amount: 0,
-    fee_date: dayjs(),
-    fee_type: '其他',
-    remark: ''
-  } as any
-);
+const newRow = reactive<any>({
+  key: 'new-row',
+  fee_desc: '',
+  fee_amount: undefined,
+  fee_date: dayjs(),
+  fee_type: '其他',
+  remark: ''
+});
 
-const formRules = reactive<any>({
-  fee_desc: [
-    { required: true, message: '请输入费用描述', trigger: ['blur', 'change'] },
-    { type: 'string', min: 1, max: 50, message: '费用描述长度1-50字符', trigger: ['blur', 'change'] }
-  ],
-  fee_amount: [
-    { required: true, message: '请输入费用金额', trigger: ['blur', 'change'] },
-    { type: 'number', min: 0.01, message: '费用金额必须为正数', trigger: ['blur', 'change'] }
-  ],
-  fee_date: [
-    { required: true, message: '请选择费用日期', trigger: ['change'] }
-  ],
-  fee_type: [
-    { required: true, message: '请选择费用类型', trigger: ['change'] }
-  ]
+const tableDataSource = computed(() => {
+  const result: any[] = [{ ...newRow }];
+  dataSource.value.forEach(item => {
+    const isEditing = !!editingRows.value[item.id];
+    result.push({ ...item, isEditing });
+  });
+  return result;
 });
 
 const columns = computed(() => [
@@ -201,8 +250,7 @@ const columns = computed(() => [
     key: 'fee_amount', 
     sorter: true, 
     ellipsis: true, 
-    width: 150,
-    customRender: (opt: any) => opt.record.fee_amount.toFixed(2) 
+    width: 150
   },
   {
     title: '费用日期',
@@ -225,13 +273,7 @@ const columns = computed(() => [
     dataIndex: 'remark',
     key: 'remark',
     ellipsis: true,
-    width: 100,
-    customRender: (opt: { record: CostFeeItem }) => {
-      const remark = opt.record.remark;
-      if (!remark) return '-';
-      const shortRemark = remark.length > 4 ? remark.substring(0, 4) + '...' : remark;
-      return h(Tooltip, { title: remark }, { default: () => shortRemark });
-    }
+    width: 100
   },
   {
     title: '创建时间',
@@ -241,40 +283,11 @@ const columns = computed(() => [
     ellipsis: true,
     width: 180
   },
-  {
+  { 
     title: '操作',
     key: 'action',
     fixed: 'right' as const,
-    width: 120,
-    customRender: ({ record }: { record: CostFeeItem }) => {
-      return h('div', [
-        h('span', {
-          style: {
-            display: 'inline-block',
-            padding: '2px 8px',
-            backgroundColor: '#1890ff',
-            color: '#fff',
-            borderRadius: '2px',
-            cursor: 'pointer',
-            marginRight: '8px',
-            fontSize: '12px'
-          },
-          onClick: () => openEditModal(record)
-        }, '改'),
-        h('span', {
-          style: {
-            display: 'inline-block',
-            padding: '2px 8px',
-            backgroundColor: '#ff4d4f',
-            color: '#fff',
-            borderRadius: '2px',
-            cursor: 'pointer',
-            fontSize: '12px'
-          },
-          onClick: () => handleDelete(record.id)
-        }, '删')
-      ]);
-    }
+    width: 160
   }
 ]) as any;
 
@@ -289,7 +302,6 @@ const fetchData = async () => {
     
     const response = await getCostFeeList(queryParams);
     
-    // 字段映射：将后端返回的expense_*字段映射到前端使用的fee_*字段
     dataSource.value = response.data.list.map((item: any) => ({
       id: item.id,
       fee_desc: item.expense_desc,
@@ -330,67 +342,78 @@ const resetSearch = () => {
   fetchData();
 };
 
-const openAddModal = () => {
-  Object.assign(formData, {
-    id: undefined,
-    fee_desc: '',
-    fee_amount: 0,
-    fee_date: dayjs(),
-    fee_type: '其他',
-    remark: ''
-  });
-  modalTitle.value = '新增运营杂费';
-  modalVisible.value = true;
-};
+const handleAdd = async () => {
+  if (!newRow.fee_desc || !newRow.fee_amount || !newRow.fee_date || !newRow.fee_type) {
+    message.error('请填写必填项');
+    return;
+  }
 
-const openEditModal = (record: CostFeeItem) => {
-  Object.assign(formData, {
-    id: record.id,
-    fee_desc: record.fee_desc,
-    fee_amount: record.fee_amount,
-    fee_date: dayjs(record.fee_date),
-    fee_type: record.fee_type,
-    remark: record.remark || ''
-  });
-  modalTitle.value = '修改运营杂费';
-  modalVisible.value = true;
-};
-
-const handleSubmit = async () => {
   try {
     const submitData = {
-      ...formData,
-      fee_date: typeof formData.fee_date === 'object' && formData.fee_date !== null && typeof (formData.fee_date as any).format === 'function' ? (formData.fee_date as any).format('YYYY-MM-DD') : undefined
+      ...newRow,
+      fee_date: typeof newRow.fee_date === 'object' && newRow.fee_date !== null && typeof (newRow.fee_date as any).format === 'function' ? (newRow.fee_date as any).format('YYYY-MM-DD') : undefined
     };
     
-    if (formData.id) {
-      await updateCostFee(submitData as UpdateCostFeeReq);
-      message.success('操作成功');
-      modalVisible.value = false;
-      fetchData();
-    } else {
-      await addCostFee(submitData as AddCostFeeReq);
-      message.success('操作成功');
-      modalVisible.value = false;
-      fetchData();
-    }
+    delete submitData.key;
+    
+    await addCostFee(submitData as AddCostFeeReq);
+    message.success('添加成功');
+    
+    Object.assign(newRow, {
+      fee_desc: '',
+      fee_amount: undefined,
+      fee_date: dayjs(),
+      fee_type: '其他',
+      remark: ''
+    });
+    
+    fetchData();
   } catch (error: any) {
-    console.error('提交失败:', error);
+    console.error('添加失败:', error);
     Modal.error({
-      title: '操作失败',
+      title: '添加失败',
       content: error.message || '服务器错误，请稍后重试'
     });
   }
 };
 
-const handleReset = () => {
-  if (!formData.id) {
-    Object.assign(formData, {
-      fee_desc: '',
-      fee_amount: 0,
-      fee_date: dayjs(),
-      fee_type: '其他',
-      remark: ''
+const handleEdit = (record: any) => {
+  editingRows.value[record.id] = {
+    ...record,
+    fee_date: dayjs(record.fee_date)
+  };
+};
+
+const handleCancelEdit = (id: number) => {
+  delete editingRows.value[id];
+};
+
+const handleSave = async (id: number) => {
+  const row = editingRows.value[id];
+  if (!row.fee_desc || !row.fee_amount || !row.fee_date || !row.fee_type) {
+    message.error('请填写必填项');
+    return;
+  }
+
+  try {
+    const submitData = {
+      id,
+      fee_desc: row.fee_desc,
+      fee_amount: row.fee_amount as number,
+      fee_date: typeof row.fee_date === 'object' && row.fee_date !== null && typeof (row.fee_date as any).format === 'function' ? (row.fee_date as any).format('YYYY-MM-DD') : undefined,
+      fee_type: row.fee_type,
+      remark: row.remark
+    };
+    
+    await updateCostFee(submitData as UpdateCostFeeReq);
+    message.success('保存成功');
+    delete editingRows.value[id];
+    fetchData();
+  } catch (error: any) {
+    console.error('保存失败:', error);
+    Modal.error({
+      title: '保存失败',
+      content: error.message || '服务器错误，请稍后重试'
     });
   }
 };
@@ -398,7 +421,6 @@ const handleReset = () => {
 const handleDelete = (id: number) => {
   Modal.confirm({
     title: '确认删除',
-    icon: () => h(ExclamationCircleOutlined),
     content: '删除后不可恢复',
     okText: '确认',
     cancelText: '取消',
@@ -428,13 +450,5 @@ onMounted(() => {
   padding: 20px;
   height: 100%;
   background-color: #f5f5f5;
-}
-
-:deep(.ant-modal-body) {
-  padding: 24px;
-}
-
-:deep(.ant-form-item) {
-  margin-bottom: 16px;
 }
 </style>
