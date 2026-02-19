@@ -46,9 +46,10 @@ async def add_sale(data) -> Dict[str, Any]:
         sale_date = datetime.strptime(data.sale_date, "%Y-%m-%d")
     except ValueError:
         raise ParamErrorException(message="销售日期格式错误，要求%Y-%m-%d")
-    # 直接使用整数类型的规格值
-    spec_value = float(product_spec)
-    total_price = unit_price * spec_value * sale_num
+    # 直接使用前端传入的总金额
+    total_price = data.total_price
+    if total_price <= 0:
+        raise ParamErrorException(message="总金额必须大于0")
 
     # 1. 校验采购商存在 → 抛出404统一异常
     purchaser = repo.purchaser.get_by_name(purchaser_name)
@@ -92,7 +93,7 @@ async def add_sale(data) -> Dict[str, Any]:
 
     # 5. 计算利润（快照）
     unit_profit = unit_price - unit_cost
-    total_profit = unit_profit * sale_num * spec_value
+    total_profit = unit_profit * sale_num * float(product_spec)
 
     # 10. 自动生成/更新销售对账单（含利润聚合）
     await _ensure_sale_statement(db, purchaser_id, total_price, total_profit, sale_num * unit_cost)
@@ -130,7 +131,7 @@ async def add_sale(data) -> Dict[str, Any]:
 
     # 8. 扣减库存
     new_stock = current_stock - sale_num
-    new_value = unit_cost * new_stock * spec_value
+    new_value = unit_cost * new_stock * float(product_spec)
     repo.goods.update_stock_and_cost(
         goods_id=goods_id,
         new_stock=new_stock,
@@ -273,6 +274,25 @@ async def update_sale(data) -> None:
     old_profit = float(old["total_profit"])
     old_cost = float(old["trade_unit_cost"]) * old_num  # 总成本
     old_purchaser_id = old["purchaser_id"]
+    old_sale_date = old["sale_date"]
+    
+    # 检查原销售记录是否在已确认对账单期间内
+    confirmed_statements = repo.sale_statement.get_confirmed_statements(old_purchaser_id)
+    for stmt in confirmed_statements:
+        start_date = stmt.get("start_date")
+        end_date = stmt.get("end_date")
+        if start_date and end_date:
+            # 确保日期类型一致
+            if hasattr(start_date, "date"):
+                start_date = start_date.date()
+            if hasattr(end_date, "date"):
+                end_date = end_date.date()
+            if hasattr(old_sale_date, "date"):
+                old_sale_date_to_check = old_sale_date.date()
+            else:
+                old_sale_date_to_check = old_sale_date
+            if start_date <= old_sale_date_to_check <= end_date:
+                raise CustomAPIException(code=604, message="该销售记录在已确认对账单期间内，禁止修改")
 
     # 2. 恢复旧库存（加回数量）
     goods = repo.goods.get_by_id(old_goods_id)
@@ -301,9 +321,10 @@ async def update_sale(data) -> None:
     new_num = data.sale_num
     new_price = data.sale_price
     new_product_spec = data.product_spec if hasattr(data, "product_spec") else old_spec
-    # 直接使用整数类型的规格值
-    new_spec_value = float(new_product_spec)
-    new_total = new_price * new_spec_value * new_num
+    # 直接使用前端传入的总金额
+    new_total = data.total_price
+    if new_total <= 0:
+        raise ParamErrorException(message="总金额必须大于0")
     # 增加日期格式校验
     try:
         new_date = datetime.strptime(data.sale_date, "%Y-%m-%d")
@@ -333,7 +354,7 @@ async def update_sale(data) -> None:
 
     # 7. 扣减新库存
     final_stock = new_current_stock - new_num
-    final_value = new_unit_cost * final_stock * new_spec_value
+    final_value = new_unit_cost * final_stock * float(new_product_spec)
     repo.goods.update_stock_and_cost(
         goods_id=new_goods_id,
         new_stock=final_stock,

@@ -123,12 +123,14 @@
             <a-input
               v-model:value="newRow.product_spec"
               placeholder="请输入商品规格，例如：30"
+              @change="calculateNewRowTotalFromPrice"
             />
           </template>
           <template v-else-if="record.isEditing">
             <a-input
               v-model:value="editingRows[record.id].product_spec"
               placeholder="请输入商品规格，例如：30"
+              @change="() => calculateEditingRowTotalFromPrice(record.id)"
             />
           </template>
           <template v-else>{{ record.product_spec }}</template>
@@ -157,6 +159,7 @@
               :precision="0"
               placeholder="请输入销售数量"
               style="width: 100%"
+              @change="calculateNewRowTotalFromPrice"
             />
           </template>
           <template v-else-if="record.isEditing">
@@ -167,6 +170,7 @@
               :precision="0"
               placeholder="请输入销售数量"
               style="width: 100%"
+              @change="() => calculateEditingRowTotalFromPrice(record.id)"
             />
           </template>
           <template v-else>{{ record.sale_num }}</template>
@@ -180,6 +184,7 @@
               :precision="2"
               placeholder="请输入销售单价"
               style="width: 100%"
+              @change="calculateNewRowTotalFromPrice"
             />
           </template>
           <template v-else-if="record.isEditing">
@@ -190,16 +195,33 @@
               :precision="2"
               placeholder="请输入销售单价"
               style="width: 100%"
+              @change="() => calculateEditingRowTotalFromPrice(record.id)"
             />
           </template>
           <template v-else>{{ record.sale_price?.toFixed(2) }}</template>
         </template>
         <template v-else-if="column.key === 'total_price'">
           <template v-if="record.key === 'new-row'">
-            {{ ((newRow.sale_num || 0) * (newRow.sale_price || 0) * (Number(newRow.product_spec) || 0)).toFixed(2) }}
+            <a-input-number
+              v-model:value="newRow.total_price"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              placeholder="请输入销售总价"
+              style="width: 100%"
+              @change="calculateNewRowPriceFromTotal"
+            />
           </template>
           <template v-else-if="record.isEditing">
-            {{ ((editingRows[record.id].sale_num || 0) * (editingRows[record.id].sale_price || 0) * (Number(editingRows[record.id].product_spec) || 0)).toFixed(2) }}
+            <a-input-number
+              v-model:value="editingRows[record.id].total_price"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              placeholder="请输入销售总价"
+              style="width: 100%"
+              @change="() => calculateEditingRowPriceFromTotal(record.id)"
+            />
           </template>
           <template v-else>{{ record.total_price?.toFixed(2) }}</template>
         </template>
@@ -310,6 +332,7 @@ const newRow = reactive<any>({
   customer_product_name: '',
   sale_num: undefined,
   sale_price: undefined,
+  total_price: undefined,
   sale_date: dayjs(),
   remark: '',
   purchaser_id: undefined
@@ -331,15 +354,15 @@ const columns = computed(() => [
     key: 'sale_date',
     sorter: true,
     ellipsis: true,
-    width: 120
+    width: 130
   },
   {
-    title: '客户名称',
+    title: '客户名',
     dataIndex: 'purchaser_name',
     key: 'purchaser_name',
     sorter: true,
     ellipsis: true,
-    width: 130
+    width: 110
   },
   {
     title: '商品名称',
@@ -347,10 +370,10 @@ const columns = computed(() => [
     key: 'product_name',
     sorter: true,
     ellipsis: true,
-    width: 130
+    width: 110
   },
   {
-    title: '商品规格',
+    title: '规格',
     dataIndex: 'product_spec',
     key: 'product_spec',
     sorter: true,
@@ -358,12 +381,12 @@ const columns = computed(() => [
     width: 90
   },
   {
-    title: '客户侧商品名',
+    title: '销售名',
     dataIndex: 'customer_product_name',
     key: 'customer_product_name',
     sorter: true,
     ellipsis: true,
-    width: 100
+    width: 110
   },
   {
     title: '销售数量',
@@ -529,12 +552,14 @@ const fetchNewRowLastPrice = async (purchaserName: string, productName: string) 
     if (data) {
       if (data.sale_price) {
         newRow.sale_price = data.sale_price;
+        calculateNewRowTotalFromPrice();
       }
       if (data.customer_product_name) {
         newRow.customer_product_name = data.customer_product_name;
       }
       if (data.product_spec) {
         newRow.product_spec = data.product_spec;
+        calculateNewRowTotalFromPrice();
       }
     }
   } catch (error) {
@@ -553,12 +578,14 @@ const fetchEditingRowLastPrice = async (id: number, purchaserName: string, produ
     if (data && editingRows.value[id]) {
       if (data.sale_price) {
         editingRows.value[id].sale_price = data.sale_price;
+        calculateEditingRowTotalFromPrice(id);
       }
       if (data.customer_product_name) {
         editingRows.value[id].customer_product_name = data.customer_product_name;
       }
       if (data.product_spec) {
         editingRows.value[id].product_spec = data.product_spec;
+        calculateEditingRowTotalFromPrice(id);
       }
     }
   } catch (error) {
@@ -634,6 +661,7 @@ const handleAdd = async () => {
 const submitAdd = async () => {
   const submitData = {
     ...newRow,
+    total_price: newRow.total_price,
     sale_date: typeof newRow.sale_date === 'object' && newRow.sale_date !== null && typeof (newRow.sale_date as any).format === 'function' ? (newRow.sale_date as any).format('YYYY-MM-DD') : undefined
   };
   
@@ -649,6 +677,7 @@ const submitAdd = async () => {
     customer_product_name: '',
     sale_num: undefined,
     sale_price: undefined,
+    total_price: undefined,
     sale_date: dayjs(),
     remark: '',
     purchaser_id: undefined
@@ -660,7 +689,8 @@ const submitAdd = async () => {
 const handleEdit = (record: any) => {
   editingRows.value[record.id] = {
     ...record,
-    sale_date: dayjs(record.sale_date)
+    sale_date: dayjs(record.sale_date),
+    total_price: record.total_price
   };
   editingRowProductOptions.value[record.id] = [...productOptions.value];
 };
@@ -714,6 +744,7 @@ const submitSave = async (id: number) => {
     customer_product_name: row.customer_product_name,
     sale_num: row.sale_num as number,
     sale_price: row.sale_price as number,
+    total_price: row.total_price,
     sale_date: typeof row.sale_date === 'object' && row.sale_date !== null && typeof (row.sale_date as any).format === 'function' ? (row.sale_date as any).format('YYYY-MM-DD') : undefined,
     remark: row.remark
   };
@@ -745,6 +776,36 @@ const handleDelete = (id: number) => {
       }
     }
   });
+};
+
+const calculateNewRowTotalFromPrice = () => {
+  if (newRow.sale_price && newRow.sale_num) {
+    const spec = Number(newRow.product_spec) || 1;
+    newRow.total_price = newRow.sale_price * newRow.sale_num * spec;
+  }
+};
+
+const calculateNewRowPriceFromTotal = () => {
+  if (newRow.total_price && newRow.sale_num) {
+    const spec = Number(newRow.product_spec) || 1;
+    newRow.sale_price = newRow.total_price / (newRow.sale_num * spec);
+  }
+};
+
+const calculateEditingRowTotalFromPrice = (id: number) => {
+  const row = editingRows.value[id];
+  if (row && row.sale_price && row.sale_num) {
+    const spec = Number(row.product_spec) || 1;
+    row.total_price = row.sale_price * row.sale_num * spec;
+  }
+};
+
+const calculateEditingRowPriceFromTotal = (id: number) => {
+  const row = editingRows.value[id];
+  if (row && row.total_price && row.sale_num) {
+    const spec = Number(row.product_spec) || 1;
+    row.sale_price = row.total_price / (row.sale_num * spec);
+  }
 };
 
 onMounted(async () => {
