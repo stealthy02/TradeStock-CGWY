@@ -99,6 +99,7 @@ export enum InventoryChangeType {
   PURCHASE_IN = '采购入库',
   SALE_OUT = '销售出库',
   LOSS = '库存报损',
+  INIT = '库存初始化',
 }
 
 export interface AddSupplierReq {

@@ -157,7 +157,7 @@ class GoodsRepository:
         根据库存条件统计商品数量
         
         Args:
-            name (Optional[str]): 商品名称关键词
+            name (Optional[str]): 商品名称
             min_num (Optional[int]): 最小库存数量
             max_num (Optional[int]): 最大库存数量
         
@@ -166,7 +166,7 @@ class GoodsRepository:
         """
         query = self.db.query(func.count(Goods.id)).filter(Goods.is_deleted == False)
         if name:
-            query = query.filter(Goods.goods_name.like(f"%{name}%"))
+            query = query.filter(Goods.goods_name == name)
         if min_num is not None:
             query = query.filter(Goods.current_stock_num >= min_num)
         if max_num is not None:
@@ -180,7 +180,7 @@ class GoodsRepository:
         根据库存条件查询商品列表
         
         Args:
-            name (Optional[str]): 商品名称关键词
+            name (Optional[str]): 商品名称
             min_num (Optional[int]): 最小库存数量
             max_num (Optional[int]): 最大库存数量
             sort_field (str): 排序字段
@@ -194,7 +194,7 @@ class GoodsRepository:
         query = self.db.query(Goods).filter(Goods.is_deleted == False)
         
         if name:
-            query = query.filter(Goods.goods_name.like(f"%{name}%"))
+            query = query.filter(Goods.goods_name == name)
         if min_num is not None:
             query = query.filter(Goods.current_stock_num >= min_num)
         if max_num is not None:

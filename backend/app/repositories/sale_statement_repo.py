@@ -193,15 +193,16 @@ class SaleStatementRepository:
         
         # 构建查询，处理end_date为空的情况
         from sqlalchemy import or_
+        # 使用字符串格式化日期，确保SQLite能正确处理
         result = self.db.query(func.sum(SaleStatement.statement_amount)).filter(
             SaleStatement.is_deleted == False,
             or_(
                 # end_date不为空且在时间范围内
-                (SaleStatement.end_date != None) & 
+                (SaleStatement.end_date.isnot(None)) & 
                 (SaleStatement.end_date >= start_date_date) & 
                 (SaleStatement.end_date <= end_date_date),
                 # end_date为空且视为今天，今天在时间范围内
-                (SaleStatement.end_date == None) & 
+                (SaleStatement.end_date.is_(None)) & 
                 (today_date >= start_date_date) & 
                 (today_date <= end_date_date)
             )
@@ -224,11 +225,11 @@ class SaleStatementRepository:
             SaleStatement.is_deleted == False,
             or_(
                 # end_date不为空且在时间范围内
-                (SaleStatement.end_date != None) & 
+                (SaleStatement.end_date.isnot(None)) & 
                 (SaleStatement.end_date >= start_date_date) & 
                 (SaleStatement.end_date <= end_date_date),
                 # end_date为空且视为今天，今天在时间范围内
-                (SaleStatement.end_date == None) & 
+                (SaleStatement.end_date.is_(None)) & 
                 (today_date >= start_date_date) & 
                 (today_date <= end_date_date)
             )

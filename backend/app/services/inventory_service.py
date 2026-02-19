@@ -118,7 +118,7 @@ async def get_inventory_detail(
     # 格式化变动记录
     formatted_flow = []
     for flow in flow_list:
-        change_type = "采购入库" if flow["oper_type"] == 1 else "销售出库" if flow["oper_type"] == 2 else "库存报损"
+        change_type = "采购入库" if flow["oper_type"] == 1 else "销售出库" if flow["oper_type"] == 2 else "库存报损" if flow["oper_type"] == 3 else "库存初始化"
         formatted_flow.append({
             "id": flow["id"],
             "change_type": change_type,
@@ -213,6 +213,7 @@ async def add_inventory_loss(data) -> Dict[str, Any]:
         new_value=new_value
     )
 
+    # 库存流动数据变动更改处
     # 生成库存流动记录（oper_type=3 报损）
     loss_reason = data.loss_reason if hasattr(data, "loss_reason") else "其他"
     inventory_flow_repo.create({

@@ -33,7 +33,7 @@ async def add_sale(data) -> Dict[str, Any]:
     purchaser_name = data.purchaser_name
     product_name = data.product_name
     product_spec = data.product_spec
-    customer_product_name = data.customer_product_name if hasattr(data, "customer_product_name") else None
+    customer_product_name = data.customer_product_name if hasattr(data, "customer_product_name") and data.customer_product_name else product_name
     sale_num = data.sale_num
     sale_price = data.sale_price
     unit_price = sale_price
@@ -92,7 +92,7 @@ async def add_sale(data) -> Dict[str, Any]:
 
     # 5. 计算利润（快照）
     unit_profit = unit_price - unit_cost
-    total_profit = unit_profit * sale_num
+    total_profit = unit_profit * sale_num * spec_value
 
     # 10. 自动生成/更新销售对账单（含利润聚合）
     await _ensure_sale_statement(db, purchaser_id, total_price, total_profit, sale_num * unit_cost)
@@ -138,6 +138,7 @@ async def add_sale(data) -> Dict[str, Any]:
         new_value=new_value
     )
 
+    # 库存流动数据变动更改处
     # 9. 生成库存流动记录（oper_type=2 销售出库）
     repo.inventory_flow.create({
         "goods_id": goods_id,
@@ -356,9 +357,11 @@ async def update_sale(data) -> None:
     }
     repo.sale_info.update(sale_id, update_data)
 
+    # 库存流动数据变动更改处
     # 9. 更新库存流动记录
     repo.inventory_flow.delete_by_biz(2, sale_id)  # 2=销售
     purchaser_name = data.purchaser_name if hasattr(data, "purchaser_name") else repo.purchaser.get_by_id(new_purchaser_id)["purchaser_name"]
+    # 库存流动数据变动更改处
     repo.inventory_flow.create({
         "goods_id": new_goods_id,
         "oper_type": 2,
@@ -371,11 +374,12 @@ async def update_sale(data) -> None:
     })
 
     # 10. 更新客户侧商品名
-    if hasattr(data, "customer_product_name") and data.customer_product_name:
+    if hasattr(data, "customer_product_name"):
+        customer_name = data.customer_product_name if data.customer_product_name else data.product_name
         repo.goods_customer_name.save_or_update(
             goods_id=new_goods_id,
             purchaser_id=new_purchaser_id,
-            customer_name=data.customer_product_name
+            customer_name=customer_name
         )
 
     # 11. 更新新对账单
@@ -444,6 +448,7 @@ async def delete_sale(id: int) -> None:
     # 更新对账单（扣减）
     await _adjust_sale_statement(db, purchaser_id, -total, -profit, -cost)
 
+    # 库存流动数据变动更改处
     # 删除流动记录
     repo.inventory_flow.delete_by_biz(2, id)
     db.commit()

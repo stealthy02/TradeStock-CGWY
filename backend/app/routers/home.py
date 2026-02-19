@@ -100,7 +100,7 @@ async def get_pie_chart(
 
 @router.get("/home/trend-chart", response_model=ResponseModel[dict])
 async def get_trend_chart(
-    time_type: Optional[str] = Query("all", description="month/year/all/custom"),
+    time_type: Optional[str] = Query("year", description="year/custom"),
     start_date: Optional[str] = Query(None, description="开始时间 YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="结束时间 YYYY-MM-DD")
 ):
@@ -108,7 +108,7 @@ async def get_trend_chart(
     查询趋势图数据
     
     Args:
-        time_type (Optional[str]): 时间类型，可选值：month/year/all/custom
+        time_type (Optional[str]): 时间类型，可选值：year/custom
         start_date (Optional[str]): 开始时间，格式：YYYY-MM-DD
         end_date (Optional[str]): 结束时间，格式：YYYY-MM-DD
     

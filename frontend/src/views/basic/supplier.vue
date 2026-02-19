@@ -328,7 +328,7 @@ const selectedKeys = ref<number[]>([]);
 const simpleSearchKey = ref<string>('');
 
 const pageNum = ref<number>(1);
-const pageSize = ref<number>(10);
+const pageSize = ref<number>(9);
 const total = ref<number>(0);
 
 const supplierList = ref<SupplierItem[]>([]);

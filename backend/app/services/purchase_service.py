@@ -131,6 +131,7 @@ async def add_purchase(data) -> Dict[str, Any]:
             new_value=round(new_total_value, 2)
         )
         
+        # 库存流动数据变动更改处
         # 生成库存流动记录（oper_type=1 采购入库）
         inventory_flow_repo.create({
             "goods_id": goods_id,
@@ -394,9 +395,11 @@ async def update_purchase(data) -> None:
         }
         purchase_repo.update(purchase_id, update_data)
         
+        # 库存流动数据变动更改处
         # 更新库存流动记录
         inventory_flow_repo.delete_by_biz(1, purchase_id)
         supplier_name = data.supplier_name if hasattr(data, "supplier_name") else supplier_repo.get_by_id(new_supplier_id)["supplier_name"]
+        # 库存流动数据变动更改处
         inventory_flow_repo.create({
             "goods_id": new_goods_id,
             "oper_type": 1,
@@ -500,6 +503,7 @@ async def delete_purchase(id: int) -> None:
         # 更新对账单（扣除金额）
         await _adjust_purchase_statement(db, statement_repo, supplier_id, -total)
         
+        # 库存流动数据变动更改处
         # 删除库存流动记录
         inventory_flow_repo.delete_by_biz(1, id)
 

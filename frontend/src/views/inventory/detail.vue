@@ -4,10 +4,11 @@
     <div class="product-select-bar">
       <Select
         v-model:value="selectedProduct"
-        placeholder="请选择商品"
+        placeholder="请输入商品名称"
         style="width: 200px"
         show-search
-        option-filter-prop="label"
+        :filter-option="false"
+        @search="handleProductSearch"
         @change="handleProductChange"
       >
         <Option
@@ -21,7 +22,7 @@
       </Select>
       <Select
         v-model:value="selectedSpec"
-        placeholder="请选择商品规格"
+        placeholder="请选择商品型号"
         style="width: 180px; margin-left: 16px"
         @change="handleSpecChange"
       >
@@ -154,11 +155,11 @@ const fetchProductList = async () => {
 // 获取商品规格列表
 const fetchSpecList = async (productName: string) => {
   try {
-    const response = await getInventoryList();
+    // 传入商品名称参数，只获取对应商品的库存列表
+    const response = await getInventoryList({ product_name: productName });
     if (response.data.list) {
-      // 根据商品名称过滤出对应的规格列表
+      // 提取规格列表并去重
       const specs = response.data.list
-        .filter((item: InventoryItem) => item.product_name === productName)
         .map((item: InventoryItem) => item.product_spec)
         .filter((spec: string, index: number, self: string[]) => self.indexOf(spec) === index); // 去重
       specList.value = specs;
@@ -176,6 +177,19 @@ const fetchSpecList = async (productName: string) => {
   } catch (error) {
     console.error('获取规格列表失败:', error);
     specList.value = [];
+  }
+};
+
+// 处理商品搜索
+const handleProductSearch = async (value: string) => {
+  if (!value) return;
+  try {
+    const response = await selectPurchaseProduct({ keyword: value });
+    if (Array.isArray(response.data)) {
+      productList.value = response.data;
+    }
+  } catch (error) {
+    console.error('获取商品列表失败:', error);
   }
 };
 
@@ -249,6 +263,14 @@ const columns = [
     dataIndex: 'change_date',
     key: 'change_date',
     sorter: true,
+    customRender: ({ text }: { text: string }) => {
+      if (!text) return { children: '' };
+      // 只保留日期部分，去掉时间
+      const datePart = text.split(' ')[0];
+      return {
+        children: datePart
+      };
+    },
   },
   {
     title: '操作类型',
@@ -266,6 +288,9 @@ const columns = [
         case InventoryChangeType.LOSS:
           color = 'red';
           break;
+        case InventoryChangeType.INIT:
+          color = 'orange';
+          break;
         default:
           color = 'default';
       }
@@ -275,9 +300,14 @@ const columns = [
     },
   },
   {
-    title: '关联单号',
-    dataIndex: 'related_id',
-    key: 'related_id',
+    title: '变动前数量',
+    dataIndex: 'stock_before',
+    key: 'stock_before',
+    customRender: ({ record }: { record: any }) => {
+      return {
+        children: record.stock_before || 0
+      };
+    },
   },
   {
     title: '变化量',
@@ -336,6 +366,14 @@ const columns = [
           case InventoryChangeType.LOSS:
             router.push({
               path: '/layout/inventory/loss',
+              query: {
+                id: record.related_id,
+              },
+            });
+            break;
+          case InventoryChangeType.INIT:
+            router.push({
+              path: '/layout/inventory/init',
               query: {
                 id: record.related_id,
               },

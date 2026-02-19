@@ -212,10 +212,10 @@ if not static_dir:
 </head>
 <body>
     <h1>商贸库存结算管理系统</h1>
-    <p>前端文件未找到，请检查打包配置。</p>
+    <p>前端文件`{index_path}`未找到，请检查打包配置。</p>
 </body>
 </html>
-            """)
+            """.format(index_path))
         print(f"在默认目录中创建index.html文件: {index_path}")
 
 
@@ -272,12 +272,12 @@ if static_dir:
             FileResponse | dict: 文件响应或错误信息
         """
         # 先尝试直接返回静态文件（如果存在）
-        file_path = os.path.join(static_dir, path)
+        file_path = os.path.join(static_dir, path) # type: ignore
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return FileResponse(file_path)
         
         # 否则返回index.html，让前端路由处理
-        index_path = os.path.join(static_dir, "index.html")
+        index_path = os.path.join(static_dir, "index.html") # pyright: ignore[reportArgumentType]
         if os.path.exists(index_path):
             return FileResponse(index_path)
         

@@ -348,7 +348,7 @@ const simpleSearchKey = ref<string>('');
 
 // 分页参数
 const pageNum = ref<number>(1);
-const pageSize = ref<number>(10);
+const pageSize = ref<number>(9);
 const total = ref<number>(0);
 
 // 列表数据

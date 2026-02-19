@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy import event
 
 from app.config import settings
 
@@ -20,6 +21,14 @@ engine = create_engine(
     poolclass=StaticPool,  # SQLite 使用静态连接池
     echo=False  # 生产环境设为 False
 )
+
+
+# 启用 WAL 模式
+@event.listens_for(engine, 'connect')
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute('PRAGMA journal_mode = WAL;')
+    cursor.close()
 
 
 # 会话工厂

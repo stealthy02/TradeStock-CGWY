@@ -191,11 +191,11 @@ class PurchaseStatementRepository:
             PurchaseStatement.is_deleted == False,
             or_(
                 # end_date不为空且在时间范围内
-                (PurchaseStatement.end_date != None) & 
+                (PurchaseStatement.end_date.isnot(None)) & 
                 (PurchaseStatement.end_date >= start_date_date) & 
                 (PurchaseStatement.end_date <= end_date_date),
                 # end_date为空且视为今天，今天在时间范围内
-                (PurchaseStatement.end_date == None) & 
+                (PurchaseStatement.end_date.is_(None)) & 
                 (today_date >= start_date_date) & 
                 (today_date <= end_date_date)
             )

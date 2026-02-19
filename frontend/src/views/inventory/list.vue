@@ -45,7 +45,7 @@
     <a-table
       :columns="columns"
       :data-source="dataSource"
-      :row-key="(record) => record.product_name"
+      :row-key="(record) => `${record.product_name}-${record.product_spec}`"
       :pagination="{
         showSizeChanger: true,
         pageSizeOptions: ['10', '20', '50', '100'],

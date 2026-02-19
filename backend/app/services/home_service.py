@@ -1,4 +1,5 @@
 import asyncio
+import time
 from typing import Optional, Dict, List, Any
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -117,7 +118,7 @@ async def get_trend_chart_data(
     
     # 获取趋势图数据
     trend_data = await _get_trend_chart_data_by_range(
-        time_type, start_date, end_date
+        start_date, end_date
     )
     
     # 数据兜底处理
@@ -183,7 +184,7 @@ async def get_home_data(
     
     # 查询趋势图数据（单线程执行，内部并行已做隔离）
     trend_data = await _get_trend_chart_data_by_range(
-        time_type, start_date, end_date
+        start_date, end_date
     )
     
     # 并行查询饼状图分布数据 - 每个线程独立创建会话+仓库
@@ -284,27 +285,11 @@ async def _resolve_date_range(
     end_date: Optional[str]
 ) -> tuple[datetime, datetime]:
     """解析查询类型对应的时间范围，返回(start_date, end_date)"""
-    if time_type == "month":
-        # 当前月份
-        today = datetime.now()
-        start_date = datetime(today.year, today.month, 1)
-        # 计算当月最后一天
-        if today.month == 12:
-            end_date = datetime(today.year, 12, 31, 23, 59, 59)
-        else:
-            end_date = datetime(today.year, today.month + 1, 1, 0, 0, 0) - timedelta(seconds=1)
-        return start_date, end_date
-    elif time_type == "year":
+    if time_type == "year":
         # 使用标准的日历年度
         today = datetime.now()
         start_date = datetime(today.year, 1, 1)
         end_date = datetime(today.year, 12, 31, 23, 59, 59)
-        return start_date, end_date
-    elif time_type == "all":
-        # 全部数据，返回最早和最晚的时间
-        # 这里使用一个较早的日期作为起点
-        start_date = datetime(2000, 1, 1)
-        end_date = datetime.now().replace(hour=23, minute=59, second=59)
         return start_date, end_date
     elif time_type == "custom":
         # 自定义时间范围，校验参数完整性
@@ -352,46 +337,88 @@ async def _get_cycle_statistics(
 
 # 周期统计的独立线程方法
 def _get_sale_revenue_by_date(start_date, end_date):
-    db = SessionLocal()
-    repo = SaleStatementRepository(db)
-    try:
-        return repo.get_total_statement_amount_by_date(start_date, end_date)
-    finally:
-        db.close()
+    max_retries = 3
+    retry_delay = 0.5
+    
+    for attempt in range(max_retries):
+        db = SessionLocal()
+        repo = SaleStatementRepository(db)
+        try:
+            return repo.get_total_statement_amount_by_date(start_date, end_date)
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                # 最终失败返回默认值
+                return Decimal("0.00")
+        finally:
+            db.close()
 
 def _get_sale_profit_by_date(start_date, end_date):
-    db = SessionLocal()
-    repo = SaleStatementRepository(db)
-    try:
-        return repo.get_total_profit_by_date(start_date, end_date)
-    finally:
-        db.close()
+    max_retries = 3
+    retry_delay = 0.5
+    
+    for attempt in range(max_retries):
+        db = SessionLocal()
+        repo = SaleStatementRepository(db)
+        try:
+            return repo.get_total_profit_by_date(start_date, end_date)
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                # 最终失败返回默认值
+                return Decimal("0.00")
+        finally:
+            db.close()
 
 def _get_purchase_expend_by_date(start_date, end_date):
-    db = SessionLocal()
-    repo = PurchaseStatementRepository(db)
-    try:
-        return repo.get_total_statement_amount_by_date(start_date, end_date)
-    finally:
-        db.close()
+    max_retries = 3
+    retry_delay = 0.5
+    
+    for attempt in range(max_retries):
+        db = SessionLocal()
+        repo = PurchaseStatementRepository(db)
+        try:
+            return repo.get_total_statement_amount_by_date(start_date, end_date)
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                # 最终失败返回默认值
+                return Decimal("0.00")
+        finally:
+            db.close()
 
 def _get_operating_expend_by_date(start_date, end_date):
-    db = SessionLocal()
-    repo = OperatingExpenseRepository(db)
-    try:
-        return repo.get_total_amount_by_date(start_date, end_date)
-    finally:
-        db.close()
+    max_retries = 3
+    retry_delay = 0.5
+    
+    for attempt in range(max_retries):
+        db = SessionLocal()
+        repo = OperatingExpenseRepository(db)
+        try:
+            return repo.get_total_amount_by_date(start_date, end_date)
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                # 最终失败返回默认值
+                return Decimal("0.00")
+        finally:
+            db.close()
 
 
 async def _get_trend_chart_data_by_range(
-    time_type: str,
     current_start: datetime,
     current_end: datetime,
 ) -> Dict[str, List]:
     """
     获取趋势图数据
-    - all类型：按月份显示所有数据的营收/支出对比
     - custom类型：按月份聚合营收/支出数据
     """
     # 按月份聚合获取趋势数据，独立线程执行

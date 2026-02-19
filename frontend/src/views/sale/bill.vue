@@ -704,6 +704,14 @@ const handleReceiveSubmit = async () => {
     if (currentBill.value) {
       fetchBillDetail(currentBill.value.id, currentBill.value.purchaser_id);
     }
+    
+    // 重新初始化收款方式选项
+    receiveMethodOptions.value = [
+      { label: '微信', value: '微信' },
+      { label: '支付宝', value: '支付宝' },
+      { label: '银行卡', value: '银行卡' },
+      { label: '现金', value: '现金' }
+    ];
   } catch (error) {
     console.error('提交收款失败:', error);
     message.error('提交失败，请稍后重试');
