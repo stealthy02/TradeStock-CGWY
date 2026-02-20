@@ -84,6 +84,7 @@
         showSizeChanger: true,
         pageSizeOptions: ['10', '20', '50', '100'],
         showTotal: (total) => `共 ${total} 条记录`,
+        total: total,
         current: searchParams.page_num,
         pageSize: searchParams.page_size,
         onChange: handlePageChange,
@@ -872,8 +873,8 @@ const handlePurchaserSearch = async (value) => {
       params: { keyword: value }
     });
     purchaserOptions.value = response.data.map(item => ({
-      label: item.purchaser_name,
-      value: item.purchaser_name
+      label: item,
+      value: item
     }));
   } catch (error) {
     console.error('获取客户列表失败:', error);
@@ -1125,8 +1126,8 @@ onMounted(async () => {
       try {
         const response = await request({ url: '/basic/purchaser/select', method: 'get' });
         purchaserOptions.value = response.data.map(item => ({
-          label: item.purchaser_name,
-          value: item.purchaser_name
+          label: item,
+          value: item
         }));
       } catch (error) {
         console.error('获取客户列表失败:', error);

@@ -48,6 +48,7 @@
         showSizeChanger: true,
         pageSizeOptions: ['10', '20', '50', '100'],
         showTotal: (total) => `共 ${total} 条记录`,
+        total: total,
         current: searchParams.page_num,
         pageSize: searchParams.page_size,
         onChange: handlePageChange,
