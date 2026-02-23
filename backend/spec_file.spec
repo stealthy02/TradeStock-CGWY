@@ -21,6 +21,11 @@ a = Analysis(
         # 数据库相关
         'sqlalchemy',
         'alembic',
+        # Excel 相关
+        'openpyxl',
+        'openpyxl.styles',
+        'openpyxl.utils',
+        'openpyxl.worksheet',
         # 其他可能的依赖
         'pydantic',
         'pydantic_settings',
@@ -30,7 +35,12 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'PySide6',
+        'PyQt6',
+        'PyQt5',
+        'PySide2',
+    ],
     noarchive=False,
     optimize=0,
 )

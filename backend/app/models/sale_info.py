@@ -18,6 +18,8 @@ class SaleInfo(Base, SoftDeleteMixin, TimestampMixin):
     total_profit = Column(Numeric(10,2), nullable=False, comment="总利润(快照)")
     sale_date = Column(Date, nullable=False, comment="销售日期")
     statement_id = Column(Integer, ForeignKey("t_sale_statement.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
+    customer_goods_name = Column(String(50), comment="客户侧商品名")
+    delivery_no = Column(String(50), comment="送货单号")
     remark = Column(String(200), comment="备注")
     create_by = Column(Integer, comment="创建人ID")
     

@@ -228,6 +228,11 @@ async def add_inventory_loss(data) -> Dict[str, Any]:
     })
 
     db.commit()
+    
+    # 触发成本重算
+    from app.services.cost_recalc_service import recalculate_cost_for_goods
+    await recalculate_cost_for_goods(goods["id"])
+    
     return {
         "id": loss_id,
         "loss_cost": total_cost
@@ -340,6 +345,10 @@ async def delete_inventory_loss(id: int) -> None:
     inventory_loss_repo.soft_delete(id)
 
     db.commit()
+    
+    # 触发成本重算
+    from app.services.cost_recalc_service import recalculate_cost_for_goods
+    await recalculate_cost_for_goods(goods_id)
 
 
 # ==================== 库存预警/盘点 ====================

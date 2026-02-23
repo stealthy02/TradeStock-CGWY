@@ -35,6 +35,8 @@ async def list_purchase_info(
     id: Optional[int] = Query(None),
     supplier_name: Optional[str] = Query(None),
     product_name: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
     sort_field: Optional[str] = Query(None),
     sort_order: Optional[str] = Query(None),
     page_num: int = Query(1),
@@ -44,7 +46,7 @@ async def list_purchase_info(
     3.1.2 查询采购信息列表
     """
     result = await purchase_service.list_purchase_info(
-        id, supplier_name, product_name, 
+        id, supplier_name, product_name, start_date, end_date,
         sort_field, sort_order, page_num, page_size
     )
     return ResponseModel(data=result)

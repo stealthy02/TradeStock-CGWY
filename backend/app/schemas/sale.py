@@ -13,6 +13,7 @@ class SaleAdd(BaseModel):
     sale_price: float
     sale_date: str
     total_price: float
+    delivery_no: Optional[str] = None
     remark: Optional[str] = None
 
 

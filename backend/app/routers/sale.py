@@ -24,6 +24,8 @@ async def list_sale_info(
     id: Optional[int] = Query(None),
     purchaser_name: Optional[str] = Query(None),
     product_name: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
     sort_field: Optional[str] = Query(None),
     sort_order: Optional[str] = Query(None),
     page_num: int = Query(1),
@@ -33,7 +35,7 @@ async def list_sale_info(
     4.1.2 查询销售信息列表
     """
     result = await sale_service.list_sale_info(
-        id, purchaser_name, product_name,
+        id, purchaser_name, product_name, start_date, end_date,
         sort_field, sort_order, page_num, page_size
     )
     return ResponseModel(data=result)

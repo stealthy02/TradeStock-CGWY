@@ -16,7 +16,7 @@
           :filter-option="false"
           :options="supplierOptions"
           @search="handleSupplierSearch"
-          style="width: 200px"
+          style="width: 150px"
         />
       </a-form-item>
       <a-form-item label="商品名称">
@@ -27,10 +27,16 @@
           :filter-option="false"
           :options="searchProductOptions"
           @search="handleSearchProductSearch"
-          style="width: 200px"
+          style="width: 150px"
         />
       </a-form-item>
-
+      <a-form-item label="采购日期">
+        <a-range-picker
+          v-model:value="dateRange"
+          format="YYYY-MM-DD"
+          style="width: 240px"
+        />
+      </a-form-item>
 
       <a-form-item>
         <a-button type="primary" @click="() => fetchData()">查询</a-button>
@@ -270,6 +276,7 @@ const newRowProductOptions = ref<{ label: string; value: string }[]>([]);
 const dataSource = ref<PurchaseInfoItem[]>([]);
 const total = ref(0);
 const loading = ref(false);
+const dateRange = ref<any>(null);
 
 const route = useRoute();
 
@@ -393,6 +400,12 @@ const fetchData = async (id?: number) => {
       ...(id && { id })
     };
     
+    // 添加日期范围参数
+    if (dateRange.value && dateRange.value.length === 2) {
+      queryParams.start_date = dateRange.value[0].format('YYYY-MM-DD');
+      queryParams.end_date = dateRange.value[1].format('YYYY-MM-DD');
+    }
+    
     const response = await getPurchaseInfoList(queryParams);
     dataSource.value = response.data.list;
     total.value = response.data.total;
@@ -420,6 +433,7 @@ const resetSearch = () => {
   searchParams.page_size = 10;
   searchParams.supplier_name = '';
   searchParams.product_name = '';
+  dateRange.value = null;
   searchProductOptions.value = [];
   fetchData();
 };

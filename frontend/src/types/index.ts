@@ -262,7 +262,7 @@ export interface PurchaseBillDetailQuery {
 export interface PurchaseBillDetailItem {
   product_name: string;
   purchase_date: string;
-  total_kg: number;
+  total_num: number;
   total_price: number;
 }
 
@@ -317,6 +317,7 @@ export interface AddSaleInfoReq {
   sale_num: number;
   sale_price: number;
   sale_date?: string;
+  delivery_no?: string;
   remark?: string;
 }
 
@@ -351,6 +352,7 @@ export interface SaleInfoItem {
   total_profit: number;
   inventory_cost?: number;
   sale_date: string;
+  delivery_no?: string;
   remark?: string;
   create_time: string;
 }
@@ -412,7 +414,7 @@ export interface SaleBillDetailItem {
   product_name: string;
   customer_product_name?: string;
   sale_date: string;
-  total_kg: number;
+  total_num: number;
   total_price: number;
   unit_profit: number;
   total_profit: number;

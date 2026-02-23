@@ -16,7 +16,7 @@
           :filter-option="false"
           :options="purchaserOptions"
           @search="handlePurchaserSearch"
-          style="width: 200px"
+          style="width: 150px"
         />
       </a-form-item>
       <a-form-item label="商品名称">
@@ -27,17 +27,23 @@
           :filter-option="false"
           :options="searchProductOptions"
           @search="handleSearchProductSearch"
-          style="width: 200px"
+          style="width: 150px"
         />
       </a-form-item>
       <a-form-item label="客户侧商品名">
         <a-input
           v-model:value="searchParams.customer_product_name"
           placeholder="请输入客户侧商品名"
-          style="width: 200px"
+          style="width: 150px"
         />
       </a-form-item>
-
+      <a-form-item label="销售日期">
+        <a-range-picker
+          v-model:value="dateRange"
+          format="YYYY-MM-DD"
+          style="width: 240px"
+        />
+      </a-form-item>
 
       <a-form-item>
         <a-button type="primary" @click="fetchData">查询</a-button>
@@ -61,11 +67,31 @@
         onChange: handlePageChange,
         onShowSizeChange: handlePageSizeChange
       }"
-      :scroll="{ x: 1300 }"
+      :scroll="{ x: 1450 }"
       :loading="loading"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'purchaser_name'">
+        <template v-if="column.key === 'delivery_no'">
+          <template v-if="record.key === 'new-row'">
+            <a-input
+              v-model:value="newRow.delivery_no"
+              placeholder="请输入送货单号"
+            />
+          </template>
+          <template v-else-if="record.isEditing">
+            <a-input
+              v-model:value="editingRows[record.id].delivery_no"
+              placeholder="请输入送货单号"
+            />
+          </template>
+          <template v-else>
+            <a-tooltip :title="record.delivery_no" v-if="record.delivery_no">
+              {{ record.delivery_no.length > 10 ? record.delivery_no.substring(0, 10) + '...' : record.delivery_no }}
+            </a-tooltip>
+            <template v-else>-</template>
+          </template>
+        </template>
+        <template v-else-if="column.key === 'purchaser_name'">
           <template v-if="record.key === 'new-row'">
             <a-select
               v-model:value="newRow.purchaser_name"
@@ -317,6 +343,7 @@ const dataSource = ref<any[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const editingRows = ref<Record<number, any>>({});
+const dateRange = ref<any>(null);
 
 const route = useRoute();
 
@@ -335,6 +362,7 @@ const newRow = reactive<any>({
   sale_price: undefined,
   total_price: undefined,
   sale_date: dayjs(),
+  delivery_no: '',
   remark: '',
   purchaser_id: undefined
 });
@@ -350,12 +378,20 @@ const tableDataSource = computed(() => {
 
 const columns = computed(() => [
   {
+    title: '送货单号',
+    dataIndex: 'delivery_no',
+    key: 'delivery_no',
+    sorter: true,
+    ellipsis: true,
+    width: 120
+  },
+  {
     title: '销售日期',
     dataIndex: 'sale_date',
     key: 'sale_date',
     sorter: true,
     ellipsis: true,
-    width: 130
+    width: 110
   },
   {
     title: '客户名',
@@ -371,7 +407,7 @@ const columns = computed(() => [
     key: 'product_name',
     sorter: true,
     ellipsis: true,
-    width: 110
+    width: 130
   },
   {
     title: '规格',
@@ -379,7 +415,7 @@ const columns = computed(() => [
     key: 'product_spec',
     sorter: true,
     ellipsis: true,
-    width: 90
+    width: 70
   },
   {
     title: '销售名',
@@ -387,15 +423,15 @@ const columns = computed(() => [
     key: 'customer_product_name',
     sorter: true,
     ellipsis: true,
-    width: 110
+    width: 130
   },
   {
-    title: '销售数量',
+    title: '数量',
     dataIndex: 'sale_num',
     key: 'sale_num',
     sorter: true,
     ellipsis: true,
-    width: 90
+    width: 70
   },
   { 
     title: '销售单价', 
@@ -444,6 +480,12 @@ const fetchData = async (id?: number | MouseEvent) => {
       ...(typeof id === 'number' && { id })
     };
     
+    // 添加日期范围参数
+    if (dateRange.value && dateRange.value.length === 2) {
+      queryParams.start_date = dateRange.value[0].format('YYYY-MM-DD');
+      queryParams.end_date = dateRange.value[1].format('YYYY-MM-DD');
+    }
+    
     const response = await getSaleInfoList(queryParams);
     
     dataSource.value = response.data.list;
@@ -473,6 +515,7 @@ const resetSearch = () => {
   searchParams.purchaser_name = '';
   searchParams.product_name = '';
   searchParams.customer_product_name = '';
+  dateRange.value = null;
   searchProductOptions.value = [];
   fetchData();
 };
@@ -680,6 +723,7 @@ const submitAdd = async () => {
     sale_price: undefined,
     total_price: undefined,
     sale_date: dayjs(),
+    delivery_no: '',
     remark: '',
     purchaser_id: undefined
   });
@@ -747,6 +791,7 @@ const submitSave = async (id: number) => {
     sale_price: row.sale_price as number,
     total_price: row.total_price,
     sale_date: typeof row.sale_date === 'object' && row.sale_date !== null && typeof (row.sale_date as any).format === 'function' ? (row.sale_date as any).format('YYYY-MM-DD') : undefined,
+    delivery_no: row.delivery_no,
     remark: row.remark
   };
   

@@ -531,9 +531,9 @@ const detailColumns = [
     ellipsis: true
   },
   {
-    title: '总公斤数',
-    dataIndex: 'total_kg',
-    key: 'total_kg',
+    title: '总量',
+    dataIndex: 'total_num',
+    key: 'total_num',
     ellipsis: true
   },
   {

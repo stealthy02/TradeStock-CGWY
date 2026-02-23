@@ -7,7 +7,6 @@ from app.repositories.sale_statement_repo import SaleStatementRepository
 from app.repositories.sale_receipt_repo import SaleReceiptRepository
 from app.repositories.goods_repo import GoodsRepository
 from app.repositories.purchaser_repo import PurchaserRepository
-from app.repositories.goods_customer_name_repo import GoodsCustomerNameRepository
 from app.repositories.inventory_flow_repo import InventoryFlowRepository
 from app.database import get_db
 
@@ -18,13 +17,13 @@ from app.utils.exceptions import CustomAPIException, NotFoundException, ParamErr
 async def add_sale(data) -> Dict[str, Any]:
     """
     4.1.1 新增销售信息
-    - 校验库存充足（601错误）
-    - 快照当前库存成本
-    - 计算利润（单价-成本）*数量
+    - 允许负库存（不校验库存数量）
+    - 快照当前库存成本（后续重算会更新）
     - 扣减库存
     - 生成库存流动记录（出库）
     - 自动生成/更新销售对账单
     - 保存客户侧商品名（如果提供）
+    - 操作完成后触发成本重算
     """
     # 每次请求独立获取DB会话，保证线程安全
     db = next(get_db())
@@ -57,20 +56,27 @@ async def add_sale(data) -> Dict[str, Any]:
         raise NotFoundException(message="采购商不存在")
     purchaser_id = purchaser["id"]
 
-    # 2. 查询商品（按名称和规格组合）→ 抛出404统一异常
+    # 2. 获取或创建商品（按名称和规格组合）
     goods = repo.goods.get_by_name_and_spec(product_name, product_spec)
-    if not goods or goods.get("is_deleted"):
-        raise NotFoundException(message="商品不存在")
+    if not goods:
+        # 自动创建新商品，初始库存为0
+        goods_id = repo.goods.create({
+            "goods_name": product_name,
+            "product_spec": product_spec,
+            "current_stock_num": 0,
+            "stock_unit_cost": 0.00,
+            "stock_total_value": 0.00
+        })
+        current_stock = 0
+        unit_cost = 0.00
+    else:
+        if goods.get("is_deleted"):
+            raise NotFoundException(message="商品不存在")
+        goods_id = goods["id"]
+        current_stock = int(goods["current_stock_num"])
+        unit_cost = float(goods["stock_unit_cost"])  # 快照成本（后续重算会更新）
 
-    goods_id = goods["id"]
-    current_stock = int(goods["current_stock_num"])
-    unit_cost = float(goods["stock_unit_cost"])  # 快照成本
-
-    # 3. 库存校验（自定义业务码601）
-    if sale_num > current_stock:
-        raise CustomAPIException(code=601, message="库存不足：销售数量超过当前商品库存，禁止提交销售信息")
-
-    # 4. 检查销售日期是否在当前对账单开始日期之前
+    # 3. 检查销售日期是否在当前对账单开始日期之前
     # 获取该采购商当前未结束的对账单（end_date为null）
     from app.repositories.sale_statement_repo import SaleStatementRepository
     statement_repo = SaleStatementRepository(db)
@@ -91,11 +97,11 @@ async def add_sale(data) -> Dict[str, Any]:
             if sale_date_to_check <= start_date_to_check:
                 raise CustomAPIException(code=603, message="销售日期早于当前对账单开始日期，禁止添加新记录")
 
-    # 5. 计算利润（快照）
+    # 4. 计算利润（临时快照，后续重算会更新）
     unit_profit = unit_price - unit_cost
     total_profit = unit_profit * sale_num * float(product_spec)
 
-    # 10. 自动生成/更新销售对账单（含利润聚合）
+    # 5. 自动生成/更新销售对账单（含利润聚合）
     await _ensure_sale_statement(db, purchaser_id, total_price, total_profit, sale_num * unit_cost)
 
     # 6. 插入销售记录
@@ -117,19 +123,13 @@ async def add_sale(data) -> Dict[str, Any]:
         "total_profit": total_profit,
         "sale_date": sale_date,
         "statement_id": latest_statement["id"],
+        "customer_goods_name": customer_product_name,
+        "delivery_no": data.delivery_no if hasattr(data, "delivery_no") else None,
         "remark": data.remark if hasattr(data, "remark") else None
     }
     sale_id = repo.sale_info.create(sale_data)
 
-    # 7. 保存客户侧商品名（如果提供）
-    if customer_product_name:
-        repo.goods_customer_name.save_or_update(
-            goods_id=goods_id,
-            purchaser_id=purchaser_id,
-            customer_name=customer_product_name
-        )
-
-    # 8. 扣减库存
+    # 7. 扣减库存
     new_stock = current_stock - sale_num
     new_value = unit_cost * new_stock * float(product_spec)
     repo.goods.update_stock_and_cost(
@@ -139,8 +139,7 @@ async def add_sale(data) -> Dict[str, Any]:
         new_value=new_value
     )
 
-    # 库存流动数据变动更改处
-    # 9. 生成库存流动记录（oper_type=2 销售出库）
+    # 8. 生成库存流动记录（oper_type=2 销售出库）
     repo.inventory_flow.create({
         "goods_id": goods_id,
         "oper_type": 2,
@@ -154,6 +153,10 @@ async def add_sale(data) -> Dict[str, Any]:
 
     db.commit()
 
+    # 9. 触发成本重算
+    from app.services.cost_recalc_service import recalculate_cost_for_goods
+    await recalculate_cost_for_goods(goods_id)
+
     return {
         "id": sale_id,
         "total_price": total_price,
@@ -166,6 +169,8 @@ async def list_sale_info(
     id: Optional[int],
     purchaser_name: Optional[str],
     product_name: Optional[str],
+    start_date: Optional[str],
+    end_date: Optional[str],
     sort_field: Optional[str],
     sort_order: Optional[str],
     page_num: int,
@@ -187,6 +192,20 @@ async def list_sale_info(
         if purchaser:
             purchaser_id = purchaser["id"]
 
+    # 解析日期范围
+    start_date_obj = None
+    end_date_obj = None
+    if start_date:
+        try:
+            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
     # 排序映射
     sort_mapping = {
         "sale_date": "sale_date",
@@ -201,7 +220,9 @@ async def list_sale_info(
     total = repo.sale_info.count_by_conditions(
         id=id,
         purchaser_id=purchaser_id,
-        product_name=product_name
+        product_name=product_name,
+        start_date=start_date_obj,
+        end_date=end_date_obj
     )
     pages = (total + page_size - 1) // page_size if total > 0 else 0
 
@@ -213,29 +234,27 @@ async def list_sale_info(
         sort_field=db_sort_field,
         sort_order=db_sort_order,
         offset=(page_num - 1) * page_size,
-        limit=page_size
+        limit=page_size,
+        start_date=start_date_obj,
+        end_date=end_date_obj
     )
 
     formatted_list = []
     for item in list_data:
-        # 查询客户侧商品名
-        customer_name = repo.goods_customer_name.get_customer_name(
-            goods_id=item["goods_id"],
-            purchaser_id=item["purchaser_id"]
-        )
         formatted_list.append({
             "id": item["id"],
             "purchaser_id": item["purchaser_id"],
             "purchaser_name": item["purchaser_name"],
             "product_name": item["goods_name"],
             "product_spec": item["product_spec"],
-            "customer_product_name": customer_name,
+            "customer_product_name": item.get("customer_goods_name"),
             "sale_num": int(item["sale_num"]),
             "sale_price": float(item["sale_unit_price"]),
             "total_price": float(item["sale_total_price"]),
             "unit_profit": float(item["unit_profit"]),
             "total_profit": float(item["total_profit"]),
             "sale_date": item["sale_date"].strftime("%Y-%m-%d"),
+            "delivery_no": item.get("delivery_no"),
             "remark": item["remark"],
             "create_time": item["create_time"].strftime("%Y-%m-%d %H:%M:%S")
         })
@@ -251,9 +270,10 @@ async def update_sale(data) -> None:
     """
     4.1.3 修改销售信息
     - 恢复旧库存
-    - 更新记录（重新计算利润快照）
+    - 更新记录（临时利润，后续重算会更新）
     - 扣减新库存
     - 更新对账单（先减后加）
+    - 操作完成后触发成本重算
     """
     db = next(get_db())
     repo = _get_repositories(db)
@@ -343,16 +363,12 @@ async def update_sale(data) -> None:
         new_current_stock = int(new_goods["current_stock_num"])
         new_unit_cost = float(new_goods["stock_unit_cost"])
 
-    # 5. 库存检查（自定义业务码601）
-    if new_num > new_current_stock:
-        raise CustomAPIException(code=601, message="库存不足：销售数量超过当前商品库存，禁止提交销售信息")
-
-    # 6. 计算新利润快照
+    # 5. 计算新利润快照（临时值，后续重算会更新）
     new_unit_profit = new_price - new_unit_cost
     new_total_profit = new_unit_profit * new_num
     new_total_cost = new_unit_cost * new_num
 
-    # 7. 扣减新库存
+    # 6. 扣减新库存（允许负库存）
     final_stock = new_current_stock - new_num
     final_value = new_unit_cost * final_stock * float(new_product_spec)
     repo.goods.update_stock_and_cost(
@@ -362,7 +378,7 @@ async def update_sale(data) -> None:
         new_value=final_value
     )
 
-    # 8. 更新销售记录
+    # 7. 更新销售记录
     update_data = {
         "purchaser_id": new_purchaser_id,
         "goods_id": new_goods_id,
@@ -374,15 +390,20 @@ async def update_sale(data) -> None:
         "unit_profit": new_unit_profit,
         "total_profit": new_total_profit,
         "sale_date": new_date,
+        "delivery_no": data.delivery_no if hasattr(data, "delivery_no") else old.get("delivery_no"),
         "remark": data.remark if hasattr(data, "remark") else old["remark"]
     }
+    
+    # 更新客户侧商品名
+    if hasattr(data, "customer_product_name"):
+        customer_name = data.customer_product_name if data.customer_product_name else data.product_name
+        update_data["customer_goods_name"] = customer_name
+    
     repo.sale_info.update(sale_id, update_data)
 
-    # 库存流动数据变动更改处
-    # 9. 更新库存流动记录
+    # 8. 更新库存流动记录
     repo.inventory_flow.delete_by_biz(2, sale_id)  # 2=销售
     purchaser_name = data.purchaser_name if hasattr(data, "purchaser_name") else repo.purchaser.get_by_id(new_purchaser_id)["purchaser_name"]
-    # 库存流动数据变动更改处
     repo.inventory_flow.create({
         "goods_id": new_goods_id,
         "oper_type": 2,
@@ -394,18 +415,16 @@ async def update_sale(data) -> None:
         "oper_source": f"销售-修改-{purchaser_name}"
     })
 
-    # 10. 更新客户侧商品名
-    if hasattr(data, "customer_product_name"):
-        customer_name = data.customer_product_name if data.customer_product_name else data.product_name
-        repo.goods_customer_name.save_or_update(
-            goods_id=new_goods_id,
-            purchaser_id=new_purchaser_id,
-            customer_name=customer_name
-        )
-
-    # 11. 更新新对账单
+    # 9. 更新新对账单
     await _ensure_sale_statement(db, new_purchaser_id, new_total, new_total_profit, new_total_cost)
     db.commit()
+
+    # 10. 触发成本重算
+    from app.services.cost_recalc_service import recalculate_cost_for_goods
+    # 如果商品变更了，需要重算旧商品和新商品
+    if old_goods_id != new_goods_id:
+        await recalculate_cost_for_goods(old_goods_id)
+    await recalculate_cost_for_goods(new_goods_id)
 
 
 async def delete_sale(id: int) -> None:
@@ -414,6 +433,7 @@ async def delete_sale(id: int) -> None:
     - 恢复库存
     - 扣减对账单金额和利润
     - 软删除记录
+    - 操作完成后触发成本重算
     """
     db = next(get_db())
     repo = _get_repositories(db)
@@ -469,10 +489,13 @@ async def delete_sale(id: int) -> None:
     # 更新对账单（扣减）
     await _adjust_sale_statement(db, purchaser_id, -total, -profit, -cost)
 
-    # 库存流动数据变动更改处
     # 删除流动记录
     repo.inventory_flow.delete_by_biz(2, id)
     db.commit()
+
+    # 触发成本重算
+    from app.services.cost_recalc_service import recalculate_cost_for_goods
+    await recalculate_cost_for_goods(goods_id)
 
 
 async def select_sale_products(keyword: Optional[str], limit: int = 5) -> List[str]:
@@ -511,15 +534,9 @@ async def get_last_sale_record(purchaser_name: str, product_name: str) -> Option
     if not last_record:
         return None
 
-    # 查询客户侧商品名
-    customer_name = repo.goods_customer_name.get_customer_name(
-        goods_id=goods["id"],
-        purchaser_id=purchaser_id
-    )
-
     return {
         "sale_price": float(last_record["sale_unit_price"]),
-        "customer_product_name": customer_name,
+        "customer_product_name": last_record.get("customer_goods_name"),
         "product_spec": last_record["product_spec"]
     }
 
@@ -669,11 +686,8 @@ async def get_sale_bill_detail(bill_id: int, end_date: Optional[str] = None) -> 
     total_amount = 0.0
     total_cost = 0.0
     for s in sale_list:
-        # 查询客户侧商品名
-        customer_name = repo.goods_customer_name.get_customer_name(
-            goods_id=s["goods_id"],
-            purchaser_id=s["purchaser_id"]
-        )
+        # 直接从销售记录中获取客户侧商品名
+        customer_name = s.get("customer_goods_name")
         key = (s["goods_name"], s["sale_date"].strftime("%Y-%m-%d"))
         if key not in merged_sales:
             # 直接使用整数类型的规格值
@@ -682,9 +696,10 @@ async def get_sale_bill_detail(bill_id: int, end_date: Optional[str] = None) -> 
             merged_sales[key] = {
                 "product_name": s["goods_name"],
                 "customer_product_name": customer_name,
+                "delivery_no": s.get("delivery_no"),
                 "sale_date": s["sale_date"].strftime("%Y-%m-%d"),
                 "total_num": sale_num,
-                "total_kg": sale_num * spec_value,
+                "total_num": sale_num * spec_value,
                 "total_price": float(s["sale_total_price"]),
                 "product_spec": s.get("product_spec", ""),
                 "remark": s["remark"]
@@ -697,7 +712,7 @@ async def get_sale_bill_detail(bill_id: int, end_date: Optional[str] = None) -> 
             spec_value = float(s.get("product_spec", 1))
             sale_num = int(s["sale_num"])
             merged_sales[key]["total_num"] += sale_num
-            merged_sales[key]["total_kg"] += sale_num * spec_value
+            merged_sales[key]["total_num"] += sale_num * spec_value
             merged_sales[key]["total_price"] += float(s["sale_total_price"])
             total_amount += float(s["sale_total_price"])
             # 简化处理，不计算成本
@@ -706,9 +721,9 @@ async def get_sale_bill_detail(bill_id: int, end_date: Optional[str] = None) -> 
     # 计算单价并格式化
     formatted_sales = []
     for key, sale in merged_sales.items():
-        # 计算单价：总价格 / 总公斤数
-        if sale["total_kg"] > 0:
-            unit_price = sale["total_price"] / sale["total_kg"]
+        # 计算单价：总价格 / 总数量
+        if sale["total_num"] > 0:
+            unit_price = sale["total_price"] / sale["total_num"]
         else:
             unit_price = 0.0
         # 添加单价字段
@@ -904,7 +919,6 @@ def _get_repositories(db):
             self.sale_receipt = SaleReceiptRepository(db_conn)
             self.goods = GoodsRepository(db_conn)
             self.purchaser = PurchaserRepository(db_conn)
-            self.goods_customer_name = GoodsCustomerNameRepository(db_conn)
             self.inventory_flow = InventoryFlowRepository(db_conn)
     return Repos(db)
 
@@ -1002,15 +1016,15 @@ async def export_sale_bill(bill_id: int, end_date: Optional[str] = None) -> Dict
     """
     导出销售对账单
     - 获取对账单数据（与bill/detail相同）
-    - 转换为xlsx文件流
+    - 自动选择脚本转换为xlsx文件流
     """
-    from app.utils.export_utils import convert_to_xlsx
+    from app.utils.export_utils import auto_export
     
     # 第一步：获取与bill/detail一样的数据
     data = await get_sale_bill_detail(bill_id, end_date)
     
-    # 第二步：将数据传给convert_to_xlsx函数（暂时pass）
-    xlsx_bytes = convert_to_xlsx(data, bill_type="sale")
+    # 第二步：自动选择脚本导出
+    xlsx_bytes = auto_export(data, bill_type="sale")
     
     # 第三步：返回xlsx文件数据流
     return {

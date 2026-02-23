@@ -146,6 +146,10 @@ async def add_purchase(data) -> Dict[str, Any]:
 
         db.commit()
         
+        # 触发成本重算
+        from app.services.cost_recalc_service import recalculate_cost_for_goods
+        await recalculate_cost_for_goods(goods_id)
+        
         return {
             "id": purchase_id,
             "total_price": total_price
@@ -161,6 +165,8 @@ async def list_purchase_info(
     id: Optional[int],
     supplier_name: Optional[str],
     product_name: Optional[str],
+    start_date: Optional[str],
+    end_date: Optional[str],
     sort_field: Optional[str],
     sort_order: Optional[str],
     page_num: int,
@@ -173,6 +179,7 @@ async def list_purchase_info(
     - 关联查询供货商名称、商品名称、库存成本
     """
     from app.database import SessionLocal
+    from datetime import datetime
     db = SessionLocal()
     
     try:
@@ -188,6 +195,20 @@ async def list_purchase_info(
             if supplier:
                 supplier_id = supplier["id"]
         
+        # 解析日期范围
+        start_date_obj = None
+        end_date_obj = None
+        if start_date:
+            try:
+                start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+        if end_date:
+            try:
+                end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+        
         # 排序字段映射
         sort_mapping = {
             "purchase_date": "purchase_date",
@@ -201,7 +222,9 @@ async def list_purchase_info(
         total = purchase_repo.count_by_conditions(
             id=id,
             supplier_id=supplier_id,
-            product_name=product_name
+            product_name=product_name,
+            start_date=start_date_obj,
+            end_date=end_date_obj
         )
         
         pages = (total + page_size - 1) // page_size if total > 0 else 0
@@ -214,7 +237,9 @@ async def list_purchase_info(
             sort_field=db_sort_field,
             sort_order=db_sort_order,
             offset=(page_num - 1) * page_size,
-            limit=page_size
+            limit=page_size,
+            start_date=start_date_obj,
+            end_date=end_date_obj
         )
         
         # 格式化（关联查询名称和当前库存成本）
@@ -415,6 +440,14 @@ async def update_purchase(data) -> None:
         await _ensure_purchase_statement(db, statement_repo, new_supplier_id, new_num * new_price)
 
         db.commit()
+        
+        # 触发成本重算
+        from app.services.cost_recalc_service import recalculate_cost_for_goods
+        # 如果商品变更了，需要重算旧商品和新商品
+        if old_goods_id != new_goods_id:
+            await recalculate_cost_for_goods(old_goods_id)
+        await recalculate_cost_for_goods(new_goods_id)
+        
     except Exception as e:
         db.rollback()
         raise
@@ -503,11 +536,15 @@ async def delete_purchase(id: int) -> None:
         # 更新对账单（扣除金额）
         await _adjust_purchase_statement(db, statement_repo, supplier_id, -total)
         
-        # 库存流动数据变动更改处
-        # 删除库存流动记录
+        # 删除流动记录
         inventory_flow_repo.delete_by_biz(1, id)
 
         db.commit()
+        
+        # 触发成本重算
+        from app.services.cost_recalc_service import recalculate_cost_for_goods
+        await recalculate_cost_for_goods(goods_id)
+        
     except Exception as e:
         db.rollback()
         raise
@@ -717,7 +754,7 @@ async def get_purchase_bill_detail(bill_id: int,  end_date: Optional[str] = None
                 "product_name": product_name,
                 "purchase_date": p["purchase_date"].strftime("%Y-%m-%d"),
                 "total_num": purchase_num,
-                "total_kg": purchase_num * spec_value,
+                "total_num": purchase_num * spec_value,
                 "total_price": float(p["purchase_total_price"]),
                 "product_spec": p.get("product_spec", ""),
                 "remark": p["remark"]
@@ -728,16 +765,16 @@ async def get_purchase_bill_detail(bill_id: int,  end_date: Optional[str] = None
             spec_value = float(p.get("product_spec", 1))
             purchase_num = int(p["purchase_num"])
             merged_purchases[key]["total_num"] += purchase_num
-            merged_purchases[key]["total_kg"] += purchase_num * spec_value
+            merged_purchases[key]["total_num"] += purchase_num * spec_value
             merged_purchases[key]["total_price"] += float(p["purchase_total_price"])
             total_amount += float(p["purchase_total_price"])
     
     # 计算单价并格式化
     formatted_purchases = []
     for key, purchase in merged_purchases.items():
-        # 计算单价：总价格 / 总公斤数
-        if purchase["total_kg"] > 0:
-            unit_price = purchase["total_price"] / purchase["total_kg"]
+        # 计算单价：总价格 / 总数量
+        if purchase["total_num"] > 0:
+            unit_price = purchase["total_price"] / purchase["total_num"]
         else:
             unit_price = 0.0
         # 添加单价字段
@@ -1008,15 +1045,15 @@ async def export_purchase_bill(bill_id: int, end_date: Optional[str] = None) -> 
     """
     导出采购对账单
     - 获取对账单数据（与bill/detail相同）
-    - 转换为xlsx文件流
+    - 自动选择脚本转换为xlsx文件流
     """
-    from app.utils.export_utils import convert_to_xlsx
+    from app.utils.export_utils import auto_export
     
     # 第一步：获取与bill/detail一样的数据
     data = await get_purchase_bill_detail(bill_id, end_date)
     
-    # 第二步：将数据传给convert_to_xlsx函数（暂时pass）
-    xlsx_bytes = convert_to_xlsx(data, bill_type="purchase")
+    # 第二步：自动选择脚本导出
+    xlsx_bytes = auto_export(data, bill_type="purchase")
     
     # 第三步：返回xlsx文件数据流
     return {

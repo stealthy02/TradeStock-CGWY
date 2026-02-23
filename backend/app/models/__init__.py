@@ -7,7 +7,6 @@
 from app.models.supplier import Supplier
 from app.models.purchaser import Purchaser
 from app.models.goods import Goods
-from app.models.goods_customer_name import GoodsCustomerName
 from app.models.purchase_info import PurchaseInfo
 from app.models.purchase_statement import PurchaseStatement
 from app.models.purchase_payment import PurchasePayment
@@ -21,7 +20,7 @@ from app.models.operating_expense import OperatingExpense
 
 __all__ = [
     "Supplier", "Purchaser", "Goods", 
-    "GoodsCustomerName", "PurchaseInfo", "PurchaseStatement", 
+    "PurchaseInfo", "PurchaseStatement", 
     "PurchasePayment", "SaleInfo", "SaleStatement", "SaleReceipt",
     "InventoryLoss", "InventoryFlow", "OperatingExpense"
 ]

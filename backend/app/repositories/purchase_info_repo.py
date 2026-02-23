@@ -54,7 +54,9 @@ class PurchaseInfoRepository:
     
     def count_by_conditions(self, id: Optional[int],
                            supplier_id: Optional[int], 
-                           product_name: Optional[str]) -> int:
+                           product_name: Optional[str],
+                           start_date: Optional[datetime.date] = None,
+                           end_date: Optional[datetime.date] = None) -> int:
         query = self.db.query(func.count(PurchaseInfo.id)).join(
             Goods, PurchaseInfo.goods_id == Goods.id
         ).filter(PurchaseInfo.is_deleted == False)
@@ -65,6 +67,10 @@ class PurchaseInfoRepository:
             query = query.filter(PurchaseInfo.supplier_id == supplier_id)
         if product_name:
             query = query.filter(Goods.goods_name.like(f"%{product_name}%"))
+        if start_date:
+            query = query.filter(PurchaseInfo.purchase_date >= start_date)
+        if end_date:
+            query = query.filter(PurchaseInfo.purchase_date <= end_date)
         return query.scalar()
     
     def list_by_conditions(self, id: Optional[int],
@@ -72,7 +78,9 @@ class PurchaseInfoRepository:
                           product_name: Optional[str],
                           sort_field: Optional[str],
                           sort_order: Optional[str],
-                          offset: int, limit: int) -> List[Dict]:
+                          offset: int, limit: int,
+                          start_date: Optional[datetime.date] = None,
+                          end_date: Optional[datetime.date] = None) -> List[Dict]:
         query = self.db.query(
             PurchaseInfo,
             Supplier.supplier_name,
@@ -89,6 +97,10 @@ class PurchaseInfoRepository:
             query = query.filter(PurchaseInfo.supplier_id == supplier_id)
         if product_name:
             query = query.filter(Goods.goods_name.like(f"%{product_name}%"))
+        if start_date:
+            query = query.filter(PurchaseInfo.purchase_date >= start_date)
+        if end_date:
+            query = query.filter(PurchaseInfo.purchase_date <= end_date)
         
         # 排序
         if sort_field and hasattr(PurchaseInfo, sort_field):
